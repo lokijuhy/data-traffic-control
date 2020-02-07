@@ -7,7 +7,10 @@ setup(name='datatc',
       packages=['datatc',],
       python_requires='>3.5.0',
       install_requires=[
+            'flake8',
+            'gitpython',
             'pandas',
-
+            'pymupdf',
+            'pyyaml',
       ],
       zip_safe=False)

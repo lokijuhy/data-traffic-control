@@ -18,9 +18,9 @@ class DataInterfaceBase:
         return str(Path(file_dir_path, "{}.{}".format(file_name, cls.file_extension)))
 
     @classmethod
-    def save(cls, data: Any, file_name: str, file_dir_path: str) -> None:
+    def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = 'w') -> None:
         file_path = cls.construct_file_path(file_name, file_dir_path)
-        return cls._interface_specific_save(data, file_path)
+        return cls._interface_specific_save(data, file_path, mode)
 
     @classmethod
     def _interface_specific_save(cls, data: Any, file_path) -> None:
@@ -98,9 +98,10 @@ class YAMLDataInterface(DataInterfaceBase):
     file_extension = 'yaml'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path):
-        with open(file_path, 'w') as f:
-            f.write(data)
+    def _interface_specific_save(cls, data, file_path, mode='w'):
+        # TODO: make mode an arg in all saves
+        with open(file_path, mode) as f:
+            yaml.dump(data, f, default_flow_style=False)
 
     @classmethod
     def _interface_specific_load(cls, file_path):

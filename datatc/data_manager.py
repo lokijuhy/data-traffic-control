@@ -31,12 +31,67 @@ class DataManager:
         self.data = {}
         self.DataProcessorCacheManager = DataProcessorCacheManager()
 
+    @classmethod
+    def register_project(cls, project_hint, project_path):
+        # check that project_path is a valid path
+        expanded_project_path = Path(project_path).expanduser()
+        if not expanded_project_path.exists():
+            raise FileNotFoundError("Not a valid path: '{}'".format(project_path))
+
+        config_file_path = Path('~/.data_manager.yaml').expanduser()
+        if not config_file_path.exists():
+            cls._init_config()
+
+        cls._check_for_entry_in_config(project_hint)
+
+        cls._register_project_to_file(project_hint, expanded_project_path, config_file_path)
+
+    @staticmethod
+    def _init_config():
+        config_path = Path('~/.data_manager.yaml').expanduser()
+        open(config_path.__str__(), 'x').close()
+
+    @staticmethod
+    def _load_config():
+        config_path = Path('~/.data_manager.yaml').expanduser()
+        if config_path.exists():
+            config = yaml.safe_load(open(config_path.__str__()))
+            return config
+        else:
+            return None
+
+    @classmethod
+    def _check_for_entry_in_config(cls, project_hint):
+        config = cls._load_config()
+        if config is None:
+            return
+
+        if project_hint in config:
+            raise ValueError("Project hint '{}' is already registered, for {}"
+                             "".format(project_hint, config[project_hint]['path']))
+
+    @staticmethod
+    def _register_project_to_file(project_hint, project_path, config_file_path):
+        config_entry_data = {
+            project_hint: {
+                'path': project_path.__str__(),
+            }
+        }
+        with open(config_file_path.__str__(), 'a') as f:
+            yaml.dump(config_entry_data, f, default_flow_style=False)
+
+    @classmethod
+    def ls(cls):
+        config = cls._load_config()
+        for project_hint in config:
+            print("{}: {}".format(project_hint, config[project_hint]['path']))
+
     def _identify_data_path(self, path_hint):
         """
         Determine the data_path from the path_hint.
-        The path_hint may be a ligitimate path, in which case use it.
-        Otherwise, look for a DataManager config, and look for path_hint within the config.
-        If neither of the above work, raise an error.
+          The path_hint may be a legitimate path, in which case use it.
+          Otherwise, look for a DataManager config, and look for path_hint within the config.
+          If neither of the above work, raise an error.
 
         Args:
             path_hint: str.
@@ -58,15 +113,6 @@ class DataManager:
                                                                                               expanded_config_path))
 
         raise ValueError("Path does not exist: {}".format(path_hint))
-
-    @staticmethod
-    def _load_config():
-        config_path = Path('~/.data_manager.yaml').expanduser()
-        if config_path.exists():
-            config = yaml.safe_load(open(config_path))
-            return config
-        else:
-            return None
 
     @staticmethod
     def get_repo_path():

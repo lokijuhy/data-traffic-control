@@ -99,3 +99,12 @@ or even:
 raw_df = dm['rdsc_extracts'].select('2020-01-13').select('xlsx').load()
 
 ```
+
+## Working with File Types via `DataInterface`
+
+`DataInterface` provides a standard interface for interacting with all file types: `save()` and `load()`. This abstracts away the exact saving and loading operations for specific file types.
+
+If you want to work with a file type that `datatc` doesn't know about yet, you can create a `DataInterface` for it. In `datatc/data_interface`:
+
+ 1. Create a `DataInterface` that subclasses from `DataInterfaceBase`, and implement the `_interface_specific_save` and `_interface_specific_load` functions.
+ 1. Register your new `DataInterface` with `DataInterfaceManager` by adding it to the `DataInterfaceManager.registered_interfaces` dictionary.

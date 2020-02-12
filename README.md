@@ -90,15 +90,15 @@ The above example could also be access with the following command, which navigat
 
 ```python
 raw_df = dm['rdsc_extracts']['2020-01-13_RIS_Extract_3days_withHistory_v2'].select('xlsx').load()
-
 ```
 
 or even:
 
 ```python
 raw_df = dm['rdsc_extracts'].select('2020-01-13').select('xlsx').load()
-
 ```
+
+If you ever want to do your own load, and not use the build in `.load()`, you can also use `dm[...]['filename'].path` to get the path to the file for use in a separate loading operation.
 
 ## Working with File Types via `DataInterface`
 

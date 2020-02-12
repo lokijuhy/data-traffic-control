@@ -1,7 +1,7 @@
-import fitz
 import pandas as pd
 from pathlib import Path
 import pickle
+import dill
 from typing import Any
 import yaml
 
@@ -14,21 +14,24 @@ class DataInterfaceBase:
     file_extension = None
 
     @classmethod
-    def construct_file_path(cls, file_name: str, file_dir_path: str) -> str:
-        return str(Path(file_dir_path, "{}.{}".format(file_name, cls.file_extension)))
-
-    @classmethod
     def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = 'w') -> None:
         file_path = cls.construct_file_path(file_name, file_dir_path)
         return cls._interface_specific_save(data, file_path, mode)
+
+    @classmethod
+    def construct_file_path(cls, file_name: str, file_dir_path: str) -> str:
+        return str(Path(file_dir_path, "{}.{}".format(file_name, cls.file_extension)))
 
     @classmethod
     def _interface_specific_save(cls, data: Any, file_path) -> None:
         raise NotImplementedError
 
     @classmethod
-    def load(cls, file_name: str, file_dir_path: str) -> Any:
-        file_path = cls.construct_file_path(file_name, file_dir_path)
+    def load(cls, file_path: str) -> Any:
+        # file_path = cls.construct_file_path(file_name, file_dir_path)
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(file_path)
         return cls._interface_specific_load(file_path)
 
     @classmethod
@@ -67,6 +70,21 @@ class PickleDataInterface(DataInterfaceBase):
             return pickle.load(f)
 
 
+class DillDataInterface(DataInterfaceBase):
+
+    file_extension = 'dill'
+
+    @classmethod
+    def _interface_specific_save(cls, data: Any, file_path) -> None:
+        with open(file_path, "wb+") as f:
+            dill.dump(data, f)
+
+    @classmethod
+    def _interface_specific_load(cls, file_path) -> Any:
+        with open(file_path, "rb+") as f:
+            return dill.load(f)
+
+
 class CSVDataInterface(DataInterfaceBase):
 
     file_extension = 'csv'
@@ -80,6 +98,19 @@ class CSVDataInterface(DataInterfaceBase):
         return pd.read_csv(file_path)
 
 
+class ExcelDataInterface(DataInterfaceBase):
+
+    file_extension = 'xlsx'
+
+    @classmethod
+    def _interface_specific_save(cls, data, file_path):
+        data.to_excel(file_path)
+
+    @classmethod
+    def _interface_specific_load(cls, file_path):
+        return pd.read_excel(file_path)
+
+
 class PDFDataInterface(DataInterfaceBase):
 
     file_extension = 'pdf'
@@ -90,6 +121,7 @@ class PDFDataInterface(DataInterfaceBase):
 
     @classmethod
     def _interface_specific_load(cls, file_path):
+        import fitz
         return fitz.open(file_path)
 
 
@@ -116,6 +148,7 @@ class DataInterfaceManager:
     registered_interfaces = {
         'pkl': PickleDataInterface,
         'csv': CSVDataInterface,
+        'xlsx': ExcelDataInterface,
         'txt': TextDataInterface,
         'pdf': PDFDataInterface,
         'yaml': YAMLDataInterface,
@@ -138,7 +171,7 @@ class DataInterfaceManager:
             return file_hint
 
     @classmethod
-    def select(cls, file_hint: str, default_file_type=None):
+    def select(cls, file_hint: str, default_file_type=None) -> DataInterfaceBase:
         """
         Select the appropriate data interface based on the file_hint.
         Args:

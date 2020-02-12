@@ -3,11 +3,14 @@ import glob
 import inspect
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Dict, List
 import yaml
 
-import datatc.data_interface as di
 import datatc.git_utilities as gu
+from datatc import data_processor
+from datatc.data_directory import DataDirectory
+
+CONFIG_FILE_NAME = '.data_map.yaml'
 
 
 class DataManager:
@@ -28,50 +31,119 @@ class DataManager:
            On windows OS, the backslash in the string should be escaped!!
         """
         self.data_path = self._identify_data_path(path_hint)
-        self.data = {}
-        self.DataProcessorCacheManager = DataProcessorCacheManager()
+        self.data_directory = DataDirectory(self.data_path)
+        self.DataProcessorCacheManager = data_processor.DataProcessorCacheManager()
+
+    def reload(self):
+        self.data_directory = DataDirectory(self.data_path)
+
+    def __getitem__(self, key):
+        return self.data_directory[key]
 
     @classmethod
-    def register_project(cls, project_hint, project_path):
+    def register_project(cls, project_hint: str, project_path: str) -> None:
+        """
+        Register project and its data path to the config.
+        If no config exists, create one.
+
+        Args:
+            project_hint: Name for project
+            project_path: Path to project's data directory
+
+        Returns: None.
+
+        Raises: ValueError if project_hint already exists in file
+
+        """
         # check that project_path is a valid path
         expanded_project_path = Path(project_path).expanduser()
         if not expanded_project_path.exists():
             raise FileNotFoundError("Not a valid path: '{}'".format(project_path))
 
-        config_file_path = Path('~/.data_manager.yaml').expanduser()
+        config_file_path = Path(Path.home(), CONFIG_FILE_NAME)
         if not config_file_path.exists():
             cls._init_config()
 
-        cls._check_for_entry_in_config(project_hint)
+        config = cls._load_config()
+        hint_already_in_file = cls._check_for_entry_in_config(project_hint, config)
+        if hint_already_in_file:
+            raise ValueError("Project hint '{}' is already registered".format(project_hint))
 
         cls._register_project_to_file(project_hint, expanded_project_path, config_file_path)
 
+    @classmethod
+    def list_projects(cls) -> None:
+        """
+        List the projects registered to the config.
+
+        Returns: None. Just prints.
+
+        """
+        config = cls._load_config()
+        if len(config) == 0:
+            print("No projects registered!")
+        for project_hint in config:
+            print("{}: {}".format(project_hint, config[project_hint]['path']))
+
     @staticmethod
     def _init_config():
-        config_path = Path('~/.data_manager.yaml').expanduser()
+        """Create an empty config file."""
+        config_path = Path(Path.home(), CONFIG_FILE_NAME)
+        print("Creating config at {}".format(config_path))
         open(config_path.__str__(), 'x').close()
 
     @staticmethod
-    def _load_config():
-        config_path = Path('~/.data_manager.yaml').expanduser()
+    def _load_config() -> Dict:
+        """Load the config file. If config file is empty, return an empty dict."""
+        config_path = Path(Path.home(), CONFIG_FILE_NAME)
         if config_path.exists():
             config = yaml.safe_load(open(config_path.__str__()))
+            if config is None:
+                config = {}
             return config
         else:
-            return None
-
-    @classmethod
-    def _check_for_entry_in_config(cls, project_hint):
-        config = cls._load_config()
-        if config is None:
-            return
-
-        if project_hint in config:
-            raise ValueError("Project hint '{}' is already registered, for {}"
-                             "".format(project_hint, config[project_hint]['path']))
+            raise FileNotFoundError('Config file not found at: {}'.format(config_path))
 
     @staticmethod
-    def _register_project_to_file(project_hint, project_path, config_file_path):
+    def _check_for_entry_in_config(project_hint: str, config: Dict) -> bool:
+        """
+        Returns whether project_hint already exists in config file.
+
+        Args:
+            project_hint: Name for the project.
+            config: The config dict.
+
+        Returns: Bool for whether the project_hint is registered in the config.
+
+        """
+        if config is None:
+            return False
+
+        if project_hint in config:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def _get_path_for_project_hint(cls, project_hint: str, config: Dict) -> Path:
+        if cls._check_for_entry_in_config(project_hint, config):
+            return Path(config[project_hint]['path'])
+        else:
+            raise ValueError("Project hint '{}' is not registered".format(project_hint))
+
+    @staticmethod
+    def _register_project_to_file(project_hint: str, project_path: Path, config_file_path: Path):
+        """
+        Appends project details to specified config file.
+
+        Args:
+            project_hint: The name for the project.
+            project_path: Path to project data directory.
+            config_file_path: Path to config file.
+
+        Returns: None.
+
+        """
         config_entry_data = {
             project_hint: {
                 'path': project_path.__str__(),
@@ -80,11 +152,70 @@ class DataManager:
         with open(config_file_path.__str__(), 'a') as f:
             yaml.dump(config_entry_data, f, default_flow_style=False)
 
-    @classmethod
-    def ls(cls):
-        config = cls._load_config()
-        for project_hint in config:
-            print("{}: {}".format(project_hint, config[project_hint]['path']))
+    def ls(self, full: bool = False):
+        self.data_directory.ls(full=full)
+
+    # def ls(self):
+    #     dir_contents = self._characterize_dir(self.data_path)
+    #     self._recursive_print_dir_contents(dir_contents)
+    #
+    # def _characterize_dir(self, path):
+    #     contents = []
+    #     project_path = Path("{}/*".format(path))
+    #     subpaths = glob.glob(project_path.__str__())
+    #     for p in subpaths:
+    #         name = p.replace(path.__str__(), '').replace('/', '')
+    #         if '.' not in name:
+    #             info = {
+    #                 'type': 'directory',
+    #                 'name': name,
+    #                 'contents': self._characterize_dir(Path(p))
+    #             }
+    #         else:
+    #             info = {
+    #                 'type': 'file',
+    #                 'name': name,
+    #                 'contents': []
+    #             }
+    #         contents.append(info)
+    #     return contents
+    #
+    # @classmethod
+    # def _recursive_print_dir_contents(cls, dir_contents: List[Dict], indent: int = 0) -> None:
+    #     indent_space = ' ' * (indent*4)
+    #
+    #     # print all directories first
+    #     dirs = [item for item in dir_contents if item['type'] == 'directory']
+    #     dirs_sorted = sorted(dirs, key=lambda k: k['name'])
+    #     for item in dirs_sorted:
+    #         if item['type'] == 'directory':
+    #             print('{}{}/'.format(indent_space, item['name']))
+    #
+    #             # if dir contains only files, print summary of contents
+    #             #   otherwise, recursively print contents
+    #             dir_subcontents = item['contents']
+    #             dir_contains_subdir = any([i['type'] == 'directory' for i in dir_subcontents])
+    #             if dir_contains_subdir:
+    #                 cls._recursive_print_dir_contents(dir_subcontents, indent+1)
+    #             else:
+    #                 dir_file_type = cls._determine_dir_file_type(item['contents'])
+    #                 print('{}{} {} items'.format(' ' * (indent+1)*4, len(item['contents']), dir_file_type))
+    #
+    #     # ... then print all files
+    #     files = [item for item in dir_contents if item['type'] == 'file']
+    #     files_sorted = sorted(files, key=lambda k: k['name'])
+    #     for item in files_sorted:
+    #         if item['type'] == 'file':
+    #             print('{}{}'.format(indent_space, item['name']))
+    #
+    # @staticmethod
+    # def _determine_dir_file_type(dir_contents: List[Dict]) -> str:
+    #     file_types = [f['name'].split('.')[1] for f in dir_contents]
+    #     unique_file_types = list(set(file_types))
+    #     dir_file_type = unique_file_types[0]
+    #     if len(unique_file_types) > 1:
+    #         dir_file_type = 'mixed'
+    #     return dir_file_type
 
     def _identify_data_path(self, path_hint):
         """
@@ -112,7 +243,9 @@ class DataManager:
                 raise ValueError("Path provided in config for '{}' does not exist: {}".format(path_hint,
                                                                                               expanded_config_path))
 
-        raise ValueError("Path does not exist: {}".format(path_hint))
+        raise ValueError("Provided hint '{}' is not registered and is not a valid path. "
+                         "\n\nRegister your project with `DataManager.register_project(project_hint, project_path)`"
+                         "".format(path_hint))
 
     @staticmethod
     def get_repo_path():
@@ -204,100 +337,3 @@ class DataManager:
         return self.magic_load(sub_path, chosen_one)
 
 
-class DataProcessor:
-
-    def __init__(self, data, processor_func, code):
-        self.data_set = data
-        self.processor_func = processor_func
-        self.code = code
-
-    @property
-    def data(self):
-        return self.data_set
-
-    @property
-    def func(self):
-        return self.processor_func
-
-    def rerun(self, *args, **kwargs):
-        return self.processor_func(*args, **kwargs)
-
-    def view_code(self):
-        return self.code
-
-
-class DataProcessorCacheManager:
-
-    def __init__(self):
-        self.processor_designation = '_processor'
-        self.processor_data_interface = di.DillDataInterface
-        self.code_designation = '_code'
-        self.code_data_interface = di.TextDataInterface
-
-    def save(self, data: Any, processing_func: Callable, file_name: str, data_file_type: str, file_dir_path: str):
-        if self.check_name_already_exists(file_name, file_dir_path):
-            raise ValueError("That data processor name is already in use")
-
-        data_interface = di.DataInterfaceManager.select(data_file_type)
-        data = processing_func(data)
-        data_interface.save(data, file_name, file_dir_path)
-        self.processor_data_interface.save(processing_func, file_name + self.processor_designation, file_dir_path)
-        processing_func_code = inspect.getsource(processing_func)
-        self.code_data_interface.save(processing_func_code, file_name + self.code_designation, file_dir_path)
-
-    def load(self, file_name: str, file_dir_path: str) -> DataProcessor:
-        """
-        Load a cached data processor- the data and the function that generated it.
-        Accepts a file name with or without a file extension.
-        Args:
-            file_name: The base name of the data file. May include the file extension, otherwise the file extension
-                will be deduced.
-            file_dir_path: the path to the directory where cached data processors are stored.
-        Returns: Tuple(data, processing_func)
-        """
-        data_file_extension = None
-        if '.' in file_name:
-            file_name, data_file_extension = file_name.split('.')
-
-        # load the processor
-        processing_func = self.processor_data_interface.load(file_name + self.processor_designation, file_dir_path)
-
-        # load the data
-        code = self.code_data_interface.load(file_name + self.code_designation, file_dir_path)
-
-        # find and load the data
-        if data_file_extension is None:
-            data_file_extension = self.get_data_processor_data_type(file_name, file_dir_path)
-        data_interface = di.DataInterfaceManager.select(data_file_extension)
-        data = data_interface.load(file_name, file_dir_path)
-        return DataProcessor(data, processing_func, code)
-
-    def check_name_already_exists(self, file_name, file_dir_path):
-        existing_data_processors = self.list_cached_data_processors(file_dir_path)
-        if file_name in existing_data_processors:
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def get_data_processor_data_type(file_name, file_dir_path):
-        data_path = Path("{}/{}.*".format(file_dir_path, file_name))
-        processor_files = glob.glob(data_path.__str__())
-
-        if len(processor_files) == 0:
-            raise ValueError("No data file found for processor {}".format(file_name))
-        elif len(processor_files) > 1:
-            raise ValueError("Something went wrong- there's more than one file that matches this processor name: "
-                             "{}".format("\n - ".join(processor_files)))
-
-        data_file = processor_files[0]
-        data_file_extension = os.path.basename(data_file).split('.')[1]
-        return data_file_extension
-
-    def list_cached_data_processors(self, file_dir_path: str):
-        # glob for all processor files
-        processors_path = Path("{}/*{}.{}".format(file_dir_path, self.processor_designation,
-                                                  self.processor_data_interface.file_extension))
-        processor_files = glob.glob(processors_path.__str__())
-        processor_names = [os.path.basename(file).split('.')[0] for file in processor_files]
-        return processor_names

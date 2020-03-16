@@ -12,6 +12,7 @@ setup(name='datatc',
             'gitpython',
             'pandas',
             'pyyaml',
+            'xlrd',
       ],
       extras_require={
             'pdf': ['pymupdf']

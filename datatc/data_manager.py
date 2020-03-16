@@ -31,7 +31,7 @@ class DataManager:
            On windows OS, the backslash in the string should be escaped!!
         """
         self.data_path = self._identify_data_path(path_hint)
-        self.data_directory = DataDirectory(self.data_path)
+        self.data_directory = DataDirectory(self.data_path.__str__())
         self.DataProcessorCacheManager = data_processor.DataProcessorCacheManager()
 
     def reload(self):

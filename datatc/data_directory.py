@@ -26,7 +26,9 @@ class DataDirectory:
     def _determine_data_type(self):
         dir_data_types = [self.contents[f].data_type for f in self.contents]
         unique_dir_data_types = list(set(dir_data_types))
-        if len(unique_dir_data_types):
+        if len(unique_dir_data_types) == 0:
+            return 'empty'
+        elif len(unique_dir_data_types) > 1:
             return 'mixed'
         else:
             return unique_dir_data_types[0]

@@ -158,8 +158,8 @@ class DataManager:
     def _identify_data_path(self, path_hint):
         """
         Determine the data_path from the path_hint.
-          The path_hint may be a legitimate path, in which case use it.
-          Otherwise, look for a DataManager config, and look for path_hint within the config.
+          Look for a DataManager config, and look for path_hint within the config.
+          Otherwise, the path_hint may be a legitimate path, in which case use it.
           If neither of the above work, raise an error.
 
         Args:
@@ -168,9 +168,6 @@ class DataManager:
         Returns:
 
         """
-        expanded_path = Path(path_hint).expanduser()
-        if expanded_path.exists():
-            return expanded_path
 
         config = self._load_config()
         if config is not None and path_hint in config:
@@ -180,6 +177,10 @@ class DataManager:
             else:
                 raise ValueError("Path provided in config for '{}' does not exist: {}".format(path_hint,
                                                                                               expanded_config_path))
+
+        expanded_path = Path(path_hint).expanduser()
+        if expanded_path.exists():
+            return expanded_path
 
         raise ValueError("Provided hint '{}' is not registered and is not a valid path. "
                          "\n\nRegister your project with `DataManager.register_project(project_hint, project_path)`"

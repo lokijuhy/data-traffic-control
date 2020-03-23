@@ -34,15 +34,26 @@ class DataDirectory:
             return unique_dir_data_types[0]
 
     def select(self, hint: str) -> 'DataDirectory':
-        """Return the DataDirectory from self.contents that matches the hint."""
+        """Return the DataDirectory from self.contents that matches the hint.
+        If more than one file matches the hint, then select the one that file whose type matches the hint exactly.
+        Otherwise raise an error and display all matches.
+        """
         matches = [self.contents[d] for d in self.contents if hint in self.contents[d].name]
         if len(matches) == 1:
             return matches[0]
         elif len(matches) == 0:
             raise FileNotFoundError("No match for hint '{}'".format(hint))
         elif len(matches) > 1:
-            match_names = [m.name for m in matches]
-            raise ValueError("More than one match found: [{}]".format(', '.join(match_names)))
+            exact_matches = [self.contents[d] for d in self.contents if hint == self.contents[d].data_type]
+
+            if len(exact_matches) == 1:
+                return exact_matches[0]
+            elif len(exact_matches) == 0:
+                match_names = [m.name for m in matches]
+                raise ValueError("More than one match found: [{}]".format(', '.join(match_names)))
+            elif len(exact_matches) > 1:
+                match_names = [m.name for m in exact_matches]
+                raise ValueError("More than one match found: [{}]".format(', '.join(match_names)))
 
     def load(self):
         raise NotImplementedError("I haven't gotten to this yet!")

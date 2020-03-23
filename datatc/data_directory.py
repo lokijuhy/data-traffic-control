@@ -110,8 +110,11 @@ class DataFile(DataDirectory):
         """A file has no sub contents"""
         return {}
 
-    def load(self):
-        data_interface = DataInterfaceManager.select(self.data_type)
+    def load(self, data_interface_hint=None):
+        if data_interface_hint is None:
+            data_interface = DataInterfaceManager.select(self.data_type)
+        else:
+            data_interface = DataInterfaceManager.select(data_interface_hint)
         print('Loading {}'.format(self.path))
         return data_interface.load(self.path)
 

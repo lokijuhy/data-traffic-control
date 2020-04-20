@@ -1,0 +1,16 @@
+language: python
+python:
+  - "3.7"
+install:
+  - pip install --upgrade pip
+  - pip install --progress-bar off -e .
+# command to run tests
+script:
+  - flake8 .
+  - pytest
+notifications:
+  slack:
+    rooms:
+      - cmi-uzh:o2jdwEmDHNt9P2yRGMVneVbD#travis
+    on_success: change # default: always
+    on_failure: always # default: always

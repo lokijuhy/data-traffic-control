@@ -1,16 +1,14 @@
 language: python
 python:
-  - "3.7"
+- '3.7'
 install:
-  - pip install --upgrade pip
-  - pip install --progress-bar off -e .
-# command to run tests
+- pip install --upgrade pip
+- pip install --progress-bar off -e .
 script:
-  - flake8 .
-  - pytest
+- flake8 .
+- pytest
 notifications:
   slack:
-    rooms:
-      - cmi-uzh:o2jdwEmDHNt9P2yRGMVneVbD#travis
+    secure: RfC/aDG/WqHhgax7bTd7ug//9pWG3OJW49VNODfIky3I4wfVEjuYj9CzuuzTNufZM7d5WDgosa+K/o469zzjOWg6WPkACpNz6BbHiOLWbW/NSsVyXc7FDzMgJcnxr0uFlCZuFFiQCzrXKlvVyhzEjbxXWCJOle4koteqgsKeMiHLtSJRAZ0z8QBnyidvZlCmRZBVr+nmLVSc1q7WOaq1dsBSf3QYOtXf+YSrIaQ+p7mOF1hbeptJa14zzqo1/yInUZg3uh/PRiPrNREOZe2CwpHWiC1JgfbMeRQjVy2C9ZaF3d0yBFyseu7ob4WSDFcrWL11K5cHo3y8miHweWTtQTRLwXNIk8oKiHK1DlrU1asTp1ImudUw82WLDKZ0sHZUSz2GbzNJroO9ZCQ5SRpP7aS+lNtcCg2QINBg0Ur0Ony5GZykHtFit63HochvDc2EtcYJf3ZAHN9vXZqn8Y4K3kHnLXCjEqqYL7m1HLVfv3jduwb3roBBFOeHOXSbL2/XIVhYWUxqIscPTrmrBVpqiPeL3y5nMv1xegBn+S9jsfrUdA8U+lFbTJ1tzOrNm7kbu65ZESLr4QqAngW1jdfOemDT+Z/oQNekl+We3j+bGmTp/9CmhssuBJkakf2nF5NhqHEDc9TzwlhlYkvv0PK9vABEz6ZTFQ76AWeuyP2gldc=
     on_success: change # default: always
     on_failure: always # default: always

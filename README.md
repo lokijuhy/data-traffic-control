@@ -19,7 +19,7 @@ DataManager.register_project('project_name', '/path/to/project/data/dir/')
 Example:
 
 ```python
-DataManager.register_project('mridle', '/opt/data/radiology_resource_allocation/raw')
+DataManager.register_project('mridle', '/home/user/data/mridle/data')
 ```
 
 ### `DataManager`
@@ -37,39 +37,32 @@ dm = DataManager('mridle')
 dm.ls()
 
 # raw/
-#     MR_Termine_CIP_EntityViews/
+#     EntityViews/
 #         7 mixed items
-#     dicom_examples/
-#         1 mixed items
-#     rdsc_extracts/
-#         2019-12-24_RIS_Extract_3days_withHistory/
+#     data_extracts/
+#         2019-11-23_Extract_3days/
 #             1 mixed items
-#         2020-01-13_RIS_Extract_3days_withHistory_v2/
+#         2020-01-05_Extract_3days_withHistory_v2/
 #             2 mixed items
-#         2020-02-04_RIS_deID_3months/
+#         2020-02-04_Extract_3months/
 #             3 mixed items
-#     2019-07-10_RIS-required-fields-for-resource-allocation.xlsx
-#     GE_query-module_de.pdf
-#     GE_query-module_en.pdf
-#     RIS_Extract_top20000_with_headers.xlsx
-#     Radiologie-Dashboards_Dokumentation.docx
 #     db-connection.R
-#     query_by_marc_bovet.sql
+#     query.sql
 ```
 
 You can also print the contents of a subdirectory:
 ```python
-dm['rdsc_extracts'].ls(full=True)
+dm['data_extracts'].ls(full=True)
 
-# rdsc_extracts/
-#     2019-12-24_RIS_Extract_3days_withHistory/
-#         2019-12-24_RIS_Extract_3days_withHistory.xlsx
-#     2020-01-13_RIS_Extract_3days_withHistory_v2/
-#         2020-01-13_RIS_Extract_3days_withHistory_v2.xlsx
-#         2020-01-13_RIS_Extract_3days_withHistory_v2_sql.sql
-#     2020-02-04_RIS_deID_3months/
-#         2020-02-04_RIS_deID_3months.sql
-#         2020-02-04_RIS_deID_3months.xlsx
+# data_extracts/
+#     2019-11-23_Extract_3days/
+#         2019-11-23_Extract_3days.xlsx
+#     2020-01-05_Extract_3days_withHistory_v2/
+#         2020-01-05_Extract_3days_withHistory_v2.xlsx
+#         2020-01-05_Extract_3days_withHistory_v2_sql.sql
+#     2020-02-04_Extract_3months/
+#         2020-02-04_Extract_3months.sql
+#         2020-02-04_Extract_3months.xlsx
 #         3_month_export.csv
 ```
 
@@ -79,23 +72,34 @@ dm['rdsc_extracts'].ls(full=True)
 To load a file, navigate the file system using `[]` operators, and then call `.load()`. 
 
 ```python
-raw_df = dm['rdsc_extracts']['2020-01-13_RIS_Extract_3days_withHistory_v2']['2020-01-13_RIS_Extract_3days_withHistory_v2.xlsx'].load()
+raw_df = dm['data_extracts']['2020-02-04_Extract_3months']['2020-02-04_Extract_3months.xlsx'].load()
 ```
 
 Don't worry about what format the file is in- `DataManager` will inutit how to load the file. 
+
+If `DataManager` doesn't recognize the file type, you can give it a type hint of which loader to use. For example, `DataManager` doesn't have a specific interface for reading sql files, but if you tell it to treat it as a txt, it will load it right up:
+
+```python
+raw_df = dm['queries']['batch_query.sql'].load(data_interface_hint='txt')
+```
 
 To help you navigate those long finicky file names, `DataManager` provides a `.select('hint')` method to search for files matching a substring. 
 
 The above example could also be access with the following command, which navigates to the extract directory and selects the xlsx file:
 
 ```python
-raw_df = dm['rdsc_extracts']['2020-01-13_RIS_Extract_3days_withHistory_v2'].select('xlsx').load()
+raw_df = dm['data_extracts']['2020-02-04_Extract_3months'].select('xlsx').load()
 ```
 
 or even:
 
 ```python
-raw_df = dm['rdsc_extracts'].select('2020-01-13').select('xlsx').load()
+raw_df = dm['data_extracts'].select('2020-01-13').select('xlsx').load()
+```
+
+You can load the latest file or subdirectory within a directory with `.latest()`:
+```python
+raw_df = dm['data_extracts'].latest().select('xlsx').load()
 ```
 
 If you ever want to do your own load, and not use the build in `.load()`, you can also use `dm[...]['filename'].path` to get the path to the file for use in a separate loading operation.

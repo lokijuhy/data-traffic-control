@@ -1,7 +1,7 @@
 import unittest
-from io import StringIO
 import tempfile
-from datatc.data_manager import DataManager
+import yaml
+from datatc import DataManager
 
 
 class TestDataManager(unittest.TestCase):
@@ -10,18 +10,14 @@ class TestDataManager(unittest.TestCase):
         project_hint = 'test_project'
         project_path = 'test_path'
 
-        expected_file_contents = """
-        discern:
-            path: ~/switchdrive/Institution/discern
-        """
+        expected_config = {'test_project': {'path': 'test_path'}}
 
         with tempfile.NamedTemporaryFile() as f:
             config_file_path = f.name
             DataManager._register_project_to_file(project_hint, project_path, config_file_path)
 
-            f.seek(0)
-            file_contents = f.read()
-            self.assertEqual(file_contents, expected_file_contents)
+            config = yaml.safe_load(open(f.name))
+            self.assertEqual(config, expected_config)
 
 
 

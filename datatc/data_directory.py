@@ -1,19 +1,33 @@
 import glob
 import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 from datatc.data_interface import DataInterfaceManager
+
+
+DIRS_TO_IGNORE = ['__pycache__']
 
 
 class DataDirectory:
     """Manages interacting with data at a specific data path."""
 
-    def __init__(self, path):
+    def __init__(self, path, contents: Dict[str, 'DataDirectory'] = None):
+        """
+        Initialize a DataDirectory at a path. The contents of that DataDirectory are recursively characterized and the
+        DataDirectory's data_type set. For testing purposes, the contents can also be set directly.
+
+        Args:
+            path: The file path to which the DataDirectory corresponds.
+            contents: The files and subdirectories contained in the directory.
+        """
         # TODO: check path
         self.path = path
         self.name = os.path.basename(self.path)
-        self.contents = self._characterize_dir(self.path)
+        if contents is None:
+            self.contents = self._characterize_dir(self.path)
+        else:
+            self.contents = contents
         # determine_data_type has to be done _after_ characterize dir because it inspects the children
         self.data_type = self._determine_data_type()
 
@@ -23,7 +37,7 @@ class DataDirectory:
     def is_file(self):
         return False
 
-    def _determine_data_type(self):
+    def _determine_data_type(self) -> str:
         dir_data_types = [self.contents[f].data_type for f in self.contents]
         unique_dir_data_types = list(set(dir_data_types))
         if len(unique_dir_data_types) == 0:
@@ -55,46 +69,123 @@ class DataDirectory:
                 match_names = [m.name for m in exact_matches]
                 raise ValueError("More than one match found: [{}]".format(', '.join(match_names)))
 
+    def latest(self) -> 'DataDirectory':
+        """Return the latest data file or directory, as determined alphabetically."""
+        if len(self.contents) == 0:
+            return None
+
+        sorted_contents = sorted([d for d in self.contents])
+        latest_content = sorted_contents[-1]
+        return self.contents[latest_content]
+
     def load(self):
         raise NotImplementedError("I haven't gotten to this yet!")
 
-    def _characterize_dir(self, path) -> Dict:
+    @staticmethod
+    def _characterize_dir(path) -> Dict[str, 'DataDirectory']:
+        """
+        Characterize the contents of the DataDirectory, creating new DataDirectories for subdirectories and DataFiles
+        for files.
+
+        Args:
+            path: File path to characterize.
+
+        Returns: A Dictionary of file/directory names (str) to DataDirectory/DataFile objects.
+
+        """
         contents = {}
-        glob_path = Path(self.path, '*')
+        glob_path = Path(path, '*')
         subpaths = glob.glob(glob_path.__str__())
         for p in subpaths:
             name = os.path.basename(p)
-            if '.' not in name:
+            if name in DIRS_TO_IGNORE:
+                continue
+            if os.path.isdir(p):
                 contents[name] = DataDirectory(p)
-            else:
+            elif os.path.isfile(p):
                 contents[name] = DataFile(p)
+            else:
+                print('WARNING: {} is neither a file nor a directory.'.format(p))
         return contents
 
-    def ls(self, full=False, indent: int = 0):
-        print('{}{}/'.format(' '*4*indent, self.name))
+    def ls(self, full=False):
+        """
+        Print the contents of the data directory. Defaults to printing all subdirectories, but not all files.
 
-        if len(self.contents) > 0:
+        Args:
+            full: Whether to print all files.
+
+        Returns:
+
+        """
+        contents_ls_tree = self.build_ls_tree(full=full)
+        self.print_ls_tree(contents_ls_tree)
+
+    def build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
+        """
+        Recursively navigate the data directory tree and build a dictionary summarizing its contents.
+        All subdirectories are added to the ls_tree dictionary.
+        Files are added to the ls_tree dictionary if any of the three conditions are true:
+        - the `full` flag is used
+        - the files sit next to other subdirectories
+        - the initial directory being ls'ed contains only files, no subdirectories
+
+        Args:
+            full: flag to add all files to the ls_tree dict
+            top_dir: whether the dir currently being inspected is the initial dir that the the user called `ls` on
+
+        Returns: Dictionary describing the DataDirectory at the requested level of detail.
+        """
+        contents_ls_tree = []
+
+        if len(self.contents) == 0:
+            contents_ls_tree = self.name
+        else:
             contains_subdirs = any([not self.contents[c].is_file() for c in self.contents])
-            if contains_subdirs or full:
-                # print all directories first
+            if contains_subdirs or full or (top_dir and not contains_subdirs):
+                # build all directories first
                 dirs = [self.contents[item] for item in self.contents if not self.contents[item].is_file()]
                 dirs_sorted = sorted(dirs, key=lambda k: k.name)
-                # ... then print all files
+                for d in dirs_sorted:
+                    contents_ls_tree.append(d.build_ls_tree(full=full, top_dir=False))
+
+                # ... then collect all files
                 files = [self.contents[item] for item in self.contents if self.contents[item].is_file()]
                 files_sorted = sorted(files, key=lambda k: k.name)
-                contents_sorted = dirs_sorted + files_sorted
-
-                for d in contents_sorted:
-                    d.ls(full=full, indent=indent+1)
-
+                for f in files_sorted:
+                    contents_ls_tree.append(f.name)
             else:
-                print('{}{} {} items'.format(' '*4*(indent+1), len(self.contents), self.data_type))
+                contents_ls_tree.append('{} {} items'.format(len(self.contents), self.data_type))
+
+        return {self.name: contents_ls_tree}
+
+    def print_ls_tree(self, ls_tree: Dict[str, List], indent: int = 0) -> None:
+        """
+        Recursively print the ls_tree dictionary as created by `build_ls_tree`.
+        Args:
+            ls_tree: Dict describing a DataDirectory contents.
+            indent: indent level to print with at the current level of recursion.
+
+        Returns: None. Prints!
+
+        """
+        if type(ls_tree) == str:
+            print('{}{}'.format(' ' * 4 * indent, ls_tree))
+        else:
+            for key in ls_tree:
+                contents = ls_tree[key]
+                if len(contents) == 0:
+                    print('{}{}'.format(' ' * 4 * indent, key))
+                else:
+                    print('{}{}/'.format(' ' * 4 * indent, key))
+                    for item in contents:
+                        self.print_ls_tree(item, indent+1)
 
 
 class DataFile(DataDirectory):
 
-    def __init__(self, path):
-        super().__init__(path)
+    def __init__(self, path, contents=None):
+        super().__init__(path, contents)
 
     def __getitem__(self, key):
         raise NotADirectoryError('This is a file!')
@@ -103,10 +194,14 @@ class DataFile(DataDirectory):
         return True
 
     def _determine_data_type(self):
-        file_extension = self.name.split('.')[1]
-        return file_extension
+        root, ext = os.path.splitext(self.name)
+        if ext != '':
+            return ext.replace('.', '')
+        else:
+            return 'unknown'
 
-    def _characterize_dir(self, path) -> Dict:
+    @staticmethod
+    def _characterize_dir(path) -> Dict:
         """A file has no sub contents"""
         return {}
 
@@ -117,6 +212,3 @@ class DataFile(DataDirectory):
             data_interface = DataInterfaceManager.select(data_interface_hint)
         print('Loading {}'.format(self.path))
         return data_interface.load(self.path)
-
-    def ls(self, full=False, indent: int = 0):
-        print('{}{}'.format(' '*4*indent, self.name))

@@ -88,10 +88,18 @@ class DataManager:
         open(config_path.__str__(), 'x').close()
 
     @staticmethod
-    def _load_config() -> Dict:
-        """Load the config file. If config file is empty, return an empty dict."""
+    def _config_exists() -> bool:
+        """Determine whether a config file exists"""
         config_path = Path(Path.home(), CONFIG_FILE_NAME)
         if config_path.exists():
+            return True
+        else:
+            return False
+
+    def _load_config(self) -> Dict:
+        """Load the config file. If config file is empty, return an empty dict."""
+        if self._config_exists():
+            config_path = Path(Path.home(), CONFIG_FILE_NAME)
             config = yaml.safe_load(open(config_path.__str__()))
             if config is None:
                 config = {}
@@ -164,14 +172,15 @@ class DataManager:
 
         """
 
-        config = self._load_config()
-        if config is not None and path_hint in config:
-            expanded_config_path = Path(config[path_hint]['path']).expanduser()
-            if expanded_config_path.exists():
-                return expanded_config_path
-            else:
-                raise ValueError("Path provided in config for '{}' does not exist: {}".format(path_hint,
-                                                                                              expanded_config_path))
+        if self._config_exists():
+            config = self._load_config()
+            if config is not None and path_hint in config:
+                expanded_config_path = Path(config[path_hint]['path']).expanduser()
+                if expanded_config_path.exists():
+                    return expanded_config_path
+                else:
+                    raise ValueError("Path provided in config for '{}' does not exist: {}".format(path_hint,
+                                                                                                  expanded_config_path))
 
         expanded_path = Path(path_hint).expanduser()
         if expanded_path.exists():

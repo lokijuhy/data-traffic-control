@@ -23,7 +23,7 @@ class DataInterfaceBase:
         return str(Path(file_dir_path, "{}.{}".format(file_name, cls.file_extension)))
 
     @classmethod
-    def _interface_specific_save(cls, data: Any, file_path) -> None:
+    def _interface_specific_save(cls, data: Any, file_path, mode) -> None:
         raise NotImplementedError
 
     @classmethod
@@ -44,8 +44,8 @@ class TextDataInterface(DataInterfaceBase):
     file_extension = 'txt'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path):
-        with open(file_path, 'w') as f:
+    def _interface_specific_save(cls, data, file_path, mode='w'):
+        with open(file_path, mode) as f:
             f.write(data)
 
     @classmethod
@@ -60,8 +60,8 @@ class PickleDataInterface(DataInterfaceBase):
     file_extension = 'pkl'
 
     @classmethod
-    def _interface_specific_save(cls, data: Any, file_path) -> None:
-        with open(file_path, "wb+") as f:
+    def _interface_specific_save(cls, data: Any, file_path, mode='wb+') -> None:
+        with open(file_path, mode) as f:
             pickle.dump(data, f)
 
     @classmethod
@@ -75,8 +75,8 @@ class DillDataInterface(DataInterfaceBase):
     file_extension = 'dill'
 
     @classmethod
-    def _interface_specific_save(cls, data: Any, file_path) -> None:
-        with open(file_path, "wb+") as f:
+    def _interface_specific_save(cls, data: Any, file_path, mode='wb+') -> None:
+        with open(file_path, mode) as f:
             dill.dump(data, f)
 
     @classmethod
@@ -90,7 +90,7 @@ class CSVDataInterface(DataInterfaceBase):
     file_extension = 'csv'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path):
+    def _interface_specific_save(cls, data, file_path, mode=None):
         data.to_csv(file_path)
 
     @classmethod
@@ -103,7 +103,7 @@ class ExcelDataInterface(DataInterfaceBase):
     file_extension = 'xlsx'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path):
+    def _interface_specific_save(cls, data, file_path, mode=None):
         data.to_excel(file_path)
 
     @classmethod
@@ -116,7 +116,7 @@ class PDFDataInterface(DataInterfaceBase):
     file_extension = 'pdf'
 
     @classmethod
-    def _interface_specific_save(cls, doc, file_path):
+    def _interface_specific_save(cls, doc, file_path, mode=None):
         doc.save(file_path, garbage=4, deflate=True, clean=True)
 
     @classmethod
@@ -174,6 +174,7 @@ class DataInterfaceManager:
     def select(cls, file_hint: str, default_file_type=None) -> DataInterfaceBase:
         """
         Select the appropriate data interface based on the file_hint.
+
         Args:
             file_hint: May be a file name with an extension, or just a file extension.
             default_file_type: default file type to use, if the file_hint doesn't specify.

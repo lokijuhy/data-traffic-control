@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from datatc.data_interface import DataInterfaceManager
+from datatc.data_transformer import TransformedData
 
 
 DIRS_TO_IGNORE = ['__pycache__']
@@ -200,12 +201,24 @@ class DataFile(DataDirectory):
         else:
             return 'unknown'
 
-    @staticmethod
-    def _characterize_dir(path) -> Dict:
-        """A file has no sub contents"""
-        return {}
-
     def load(self, data_interface_hint=None):
+        if data_interface_hint is None:
+            data_interface = DataInterfaceManager.select(self.data_type)
+        else:
+            data_interface = DataInterfaceManager.select(data_interface_hint)
+        print('Loading {}'.format(self.path))
+        return data_interface.load(self.path)
+
+
+class TransformedDataFile(DataFile):
+
+    def __init__(self, path, contents=None):
+        super().__init__(path, contents)
+
+    def _determine_data_type(self):
+        return 'transformed data'
+
+    def load(self, data_interface_hint=None) -> TransformedData:
         if data_interface_hint is None:
             data_interface = DataInterfaceManager.select(self.data_type)
         else:

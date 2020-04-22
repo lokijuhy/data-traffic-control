@@ -150,6 +150,7 @@ class DataInterfaceManager:
         'csv': CSVDataInterface,
         'xlsx': ExcelDataInterface,
         'txt': TextDataInterface,
+        'sql': TextDataInterface,
         'pdf': PDFDataInterface,
         'yaml': YAMLDataInterface,
     }

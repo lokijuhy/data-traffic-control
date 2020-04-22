@@ -1,13 +1,10 @@
-import datetime
 import glob
-import inspect
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List
 
-from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
-from datatc.data_transformer import TransformedData
-from datatc import git_utilities
+from datatc.data_interface import DataInterfaceManager
+from datatc.data_transformer import TransformedData, TransformedDataInterface
 
 
 DIRS_TO_IGNORE = ['__pycache__']
@@ -88,20 +85,18 @@ class DataDirectory:
         if transformer_func is None:
             self.save_file(data, file_name)
         else:
-            tag, data_file_type = os.path.splitext(file_name)
-            self.transform_and_save(data, transformer_func, tag, data_file_type, enforce_clean_git)
+            self.transform_and_save(data, transformer_func, file_name, enforce_clean_git)
 
     def save_file(self, data: Any, file_name: str) -> None:
         data_interface = DataInterfaceManager.select(file_name)
         data_interface.save(data, file_name, self.path)
         self.contents[file_name] = DataFile(Path(self.path, file_name))
 
-    def transform_and_save(self, data: Any, transformer_func: Callable, tag: str, data_file_type: str,
-                           enforce_clean_git=True) -> None:
-
-        name, newTDD = TransformedDataDirectory.save(data, transformer_func, tag, data_file_type, parent_path=self.path,
-                                                     enforce_clean_git=enforce_clean_git)
-        self.contents[name] = newTDD
+    def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True) -> None:
+        new_transform_dir_path = TransformedDataInterface.save(data, transformer_func, parent_path=self.path,
+                                                               file_name=file_name, enforce_clean_git=enforce_clean_git)
+        base_name = os.path.basename(new_transform_dir_path)
+        self.contents[base_name] = TransformedDataDirectory(new_transform_dir_path)
         return
 
     def load(self):
@@ -220,111 +215,16 @@ class TransformedDataDirectory(DataDirectory):
     def __init__(self, path, contents=None):
         super().__init__(path, contents)
 
-        self.data_file = self._identify_file_from_contents(self.contents, 'data', self.path)
-        self.func_file = self._identify_file_from_contents(self.contents, 'func', self.path)
-        self.code_file = self._identify_file_from_contents(self.contents, 'code', self.path)
-
-        self.time_stamp, self.git_hash, self.tag = self._parse_transform_dir_name(self.name)
-
-    @staticmethod
-    def _identify_file_from_contents(contents: Dict[str, 'DataFile'], file_name: str, parent_dir: str) -> 'DataFile':
-        options = [contents[file] for file in contents if file_name in file]
-        if len(options) == 0:
-            raise ValueError('No {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir))
-        elif len(options) > 1:
-            raise ValueError('More than one {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir)
-                             )
-        else:
-            return options[0]
-
     def _determine_data_type(self):
-        # This function can't use self.data_file because this function is called in super().__init__(), and
-        # self.data_file is not set until self.__init__()
-        data_type = self._identify_file_from_contents(self.contents, 'data', self.path).data_type
-        return data_type
-
-    @classmethod
-    def transform_and_save(cls, data: Any, transformer_func: Callable, tag: str, data_file_type: str, parent_path: str,
-                           enforce_clean_git=True) -> Tuple[str, 'TransformedDataDirectory']:
-        # TODO: figure out how to move this to TransformedDataInterface
-        """
-        Save a transformed dataset.
-
-        Args:
-            data: Input data to transform.
-            transformer_func: Transform function to apply to data.
-            tag: Short description of the transform being applied.
-            data_file_type: File type to save the data as
-            parent_path: The parent path at which the new TransformedDataDirectory will be created
-            enforce_clean_git: Whether to only allow the save to proceed if the working state of the git directory is
-                clean.
-
-        Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict.
-
-        """
-        # TODO: need module 'datatc.git_utilities' has no attribute 'get_repo_path'
-        # if enforce_clean_git:
-        #     git_utilities.check_for_uncommitted_git_changes()
-
-        transform_dir_name = cls._generate_name_for_transform_dir(tag)
-        new_transform_dir_path = Path(parent_path, transform_dir_name)
-        os.makedirs(new_transform_dir_path)
-
-        data_interface = DataInterfaceManager.select(data_file_type)
-        data = transformer_func(data)
-        data_interface.save(data, 'data', new_transform_dir_path)
-
-        DillDataInterface.save(transformer_func, 'func', new_transform_dir_path)
-
-        transformer_func_code = inspect.getsource(transformer_func)
-        TextDataInterface.save(transformer_func_code, 'code', new_transform_dir_path)
-
-        new_TransformedDataDirectory = TransformedDataDirectory(new_transform_dir_path)
-
-        print('created new file {}'.format(new_transform_dir_path))
-        return transform_dir_name, new_TransformedDataDirectory
+        return TransformedDataInterface.get_info(self.path)['data_type']
 
     def load(self, data_interface_hint=None) -> 'TransformedData':
-        """
-        Load a saved data transformer- the data and the function that generated it.
-
-        Args:
-            data_interface_hint:
-
-        Returns: Tuple(data, transformer_func)
-
-        """
-        data = self.data_file.load(data_interface_hint=data_interface_hint)
-        transformer_func = self.func_file.load()
-        transformer_code = self.code_file.load()
-        return TransformedData(data, transformer_func, transformer_code)
-
-    @classmethod
-    def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
-        repo_path = git_utilities.get_repo_path()
-        git_hash = git_utilities.get_git_hash(repo_path)
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        delimiter_char = '__'
-        file_name_components = ['transformed_data_dir', timestamp, git_hash]
-        if tag is not None:
-            file_name_components.append(tag)
-        return delimiter_char.join(file_name_components)
-
-    @classmethod
-    def _parse_transform_dir_name(cls, name) -> Tuple[str, str, str]:
-        delimiter_char = '__'
-        file_name_components = name.split(delimiter_char)
-        if len(file_name_components) == 3:
-            denoter, timestamp, git_hash = file_name_components
-            tag = ''
-        elif len(file_name_components) == 4:
-            denoter, timestamp, git_hash, tag = file_name_components
-        else:
-            raise ValueError('TransformedDataDirectory name could not be parsed: {}'.format(name))
-        return timestamp, git_hash, tag
+        """Load a saved data transformer- the data and the function that generated it."""
+        return TransformedDataInterface.load(self.path, data_interface_hint)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
-        ls_description = '{}.{}'.format(self.tag, self.data_type)
+        info = TransformedDataInterface.get_info()['data_type']
+        ls_description = '{}.{}'.format(info['tag'], info['data_type'])
         return {ls_description: []}
 
 

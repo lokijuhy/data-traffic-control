@@ -1,15 +1,16 @@
 import datetime
+import glob
 import inspect
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
 from datatc import git_utilities
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from datatc.data_directory import DataDirectory, TransformedDataDirectory, DataFile
+    from datatc.data_directory import DataDirectory, TransformedDataDirectory
 
 
 class TransformedData:
@@ -47,6 +48,7 @@ class TransformedData:
 
             TransformedData.save(df, transformer, fe_dir, 'v2.csv')
         """
+        # TODO: convert DataDirectory to path/str
         return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git)
 
     @classmethod
@@ -64,57 +66,100 @@ class TransformedData:
 
 class TransformedDataInterface:
 
-    data_file_name = '_data'
-
-    func_file_name = 'func'
-    func_interface = DillDataInterface
-
-    code_file_name = 'code'
-    code_interface = TextDataInterface
+    file_component_interfaces = {
+        'data': None,
+        'func': DillDataInterface,
+        'code': TextDataInterface,
+    }
 
     @classmethod
-    def save(cls, data: Any, transformer_func: Callable, data_directory: 'DataDirectory', file_name: str,
-             enforce_clean_git=True) -> Path:
+    def save(cls, data: Any, transformer_func: Callable, parent_path: str, file_name: str, enforce_clean_git=True)\
+            -> Path:
+        """Save a transformed dataset.
+
+        Args:
+            data: Input data to transform.
+            transformer_func: Transform function to apply to data.
+            parent_path: The parent path at which the new TransformedDataDirectory will be created.
+            file_name: The name will be converted into the tag, and the extension used to determine the type to save the
+             data as.
+            enforce_clean_git: Whether to only allow the save to proceed if the working state of the git directory is
+                clean.
+
+        Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict."""
         if enforce_clean_git:
-            git_utilities.check_for_uncommitted_git_changes()
+            git_utilities.check_for_uncommitted_git_changes_at_path(git_utilities.get_repo_path())
 
         tag, data_file_type = os.path.splitext(file_name)
         transform_dir_name = cls._generate_name_for_transform_dir(tag)
-        new_transform_dir_path = Path(data_directory.path, transform_dir_name)
+        new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
         data_interface = DataInterfaceManager.select(data_file_type)
         data = transformer_func(data)
         data_interface.save(data, 'data', new_transform_dir_path)
 
-        cls.func_interface.save(transformer_func, 'func', new_transform_dir_path)
+        cls.file_component_interfaces['func'].save(transformer_func, 'func', new_transform_dir_path)
 
         transformer_func_code = inspect.getsource(transformer_func)
-        cls.code_interface.save(transformer_func_code, 'code', new_transform_dir_path)
+        cls.file_component_interfaces['code'].save(transformer_func_code, 'code', new_transform_dir_path)
 
         print('created new file {}'.format(new_transform_dir_path))
         return new_transform_dir_path
 
     @classmethod
-    def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None) -> 'TransformedData':
+    def load(cls, path: str, data_interface_hint=None) -> 'TransformedData':
         """
         Load a saved data transformer- the data and the function that generated it.
 
         Args:
-            transformed_data_dir: The TransformedDataDirectory that contains the file contents of the TransformedData
+            path: The path to the directory that contains the file contents of the TransformedData
             data_interface_hint: Optional, what data interface to use to read the data file.
 
         Returns: Tuple(data, transformer_func)
 
         """
-        data_file = cls._identify_file_from_contents(transformed_data_dir.contents, 'data', transformed_data_dir.path)
-        func_file = cls._identify_file_from_contents(transformed_data_dir.contents, 'func', transformed_data_dir.path)
-        code_file = cls._identify_file_from_contents(transformed_data_dir.contents, 'code', transformed_data_dir.path)
+        file_map = cls._identify_transform_sub_files(path)
+        data_file = file_map['data']
+        func_file = file_map['func']
+        code_file = file_map['code']
 
-        data = data_file.load(data_interface_hint=data_interface_hint)
-        transformer_func = func_file.load()
-        transformer_code = code_file.load()
+        data_interface = DataInterfaceManager.select(data_file, default_file_type=data_interface_hint)
+        data = data_interface.load(data_file)
+        transformer_func = cls.file_component_interfaces['func'].load(func_file)
+        transformer_code = cls.file_component_interfaces['code'].load(code_file)
         return TransformedData(data, transformer_func, transformer_code)
+
+    @classmethod
+    def get_info(cls, path: str) -> Dict[str, str]:
+        timestamp, git_hash, tag = cls._parse_transform_dir_name(path)
+        file_map = cls._identify_transform_sub_files(path)
+        data_file_root, data_file_type = os.path.splitext(file_map['data'])
+        return {
+            'timestamp': timestamp,
+            'git_hash': git_hash,
+            'tag': tag,
+            'data_type': data_file_type
+        }
+
+    @classmethod
+    def _identify_transform_sub_files(cls, path: str) -> Dict[str, Path]:
+        glob_path = Path(path, '*')
+        subpaths = glob.glob(glob_path.__str__())
+        file_map = {}
+        for file_component in cls.file_component_interfaces:
+            file_map[file_component] = cls._identify_sub_file(subpaths, file_component)
+        return file_map
+
+    @classmethod
+    def _identify_sub_file(cls, file_contents: List[Path], key: str) -> Path:
+        options = [file_path for file_path in file_contents if key in os.path.basename(file_path)]
+        if len(options) == 0:
+            raise ValueError('No {} file found for TransformedData'.format(key))
+        elif len(options) > 1:
+            raise ValueError('More than one {} file found for TransformedData: {}'.format(key, ', '.join(options)))
+        else:
+            return options[0]
 
     @classmethod
     def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
@@ -128,25 +173,15 @@ class TransformedDataInterface:
         return delimiter_char.join(file_name_components)
 
     @classmethod
-    def _parse_transform_dir_name(cls, name) -> Tuple[str, str, str]:
+    def _parse_transform_dir_name(cls, path) -> Tuple[str, str, str]:
         delimiter_char = '__'
-        file_name_components = name.split(delimiter_char)
-        if len(file_name_components) == 3:
-            denoter, timestamp, git_hash = file_name_components
+        dir_name = os.path.basename(path)
+        dir_name_components = dir_name.split(delimiter_char)
+        if len(dir_name_components) == 3:
+            denoter, timestamp, git_hash = dir_name_components
             tag = ''
-        elif len(file_name_components) == 4:
-            denoter, timestamp, git_hash, tag = file_name_components
+        elif len(dir_name_components) == 4:
+            denoter, timestamp, git_hash, tag = dir_name_components
         else:
-            raise ValueError('TransformedDataDirectory name could not be parsed: {}'.format(name))
+            raise ValueError('TransformedDataDirectory name could not be parsed: {}'.format(dir_name))
         return timestamp, git_hash, tag
-
-    @staticmethod
-    def _identify_file_from_contents(contents: Dict[str, 'DataFile'], file_name: str, parent_dir: str) -> 'DataFile':
-        options = [contents[file] for file in contents if file_name in file]
-        if len(options) == 0:
-            raise ValueError('No {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir))
-        elif len(options) > 1:
-            raise ValueError('More than one {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir)
-                             )
-        else:
-            return options[0]

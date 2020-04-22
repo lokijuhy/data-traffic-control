@@ -1,10 +1,13 @@
+import datetime
 import glob
+import inspect
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
-from datatc.data_interface import DataInterfaceManager
+from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
 from datatc.data_transformer import TransformedData
+from datatc import git_utilities
 
 
 DIRS_TO_IGNORE = ['__pycache__']
@@ -79,8 +82,30 @@ class DataDirectory:
         latest_content = sorted_contents[-1]
         return self.contents[latest_content]
 
+    def save(self, data: Any, file_name: str, transformer_func: Callable = None, enforce_clean_git: bool = True
+             ) -> None:
+
+        if transformer_func is None:
+            self.save_file(data, file_name)
+        else:
+            tag, data_file_type = os.path.splitext(file_name)
+            self.transform_and_save(data, transformer_func, tag, data_file_type, enforce_clean_git)
+
+    def save_file(self, data: Any, file_name: str) -> None:
+        data_interface = DataInterfaceManager.select(file_name)
+        data_interface.save(data, file_name, self.path)
+        self.contents[file_name] = DataFile(Path(self.path, file_name))
+
+    def transform_and_save(self, data: Any, transformer_func: Callable, tag: str, data_file_type: str,
+                           enforce_clean_git=True) -> None:
+
+        name, newTDD = TransformedDataDirectory.save(data, transformer_func, tag, data_file_type, parent_path=self.path,
+                                                     enforce_clean_git=enforce_clean_git)
+        self.contents[name] = newTDD
+        return
+
     def load(self):
-        raise NotImplementedError("I haven't gotten to this yet!")
+        raise NotImplementedError("Loading the entire contents of a directory has not yet been implemented!")
 
     @staticmethod
     def _characterize_dir(path) -> Dict[str, 'DataDirectory']:
@@ -102,27 +127,30 @@ class DataDirectory:
             if name in DIRS_TO_IGNORE:
                 continue
             if os.path.isdir(p):
-                contents[name] = DataDirectory(p)
+                if 'transformed_data_dir' in p:
+                    contents[name] = TransformedDataDirectory(p)
+                else:
+                    contents[name] = DataDirectory(p)
             elif os.path.isfile(p):
                 contents[name] = DataFile(p)
             else:
                 print('WARNING: {} is neither a file nor a directory.'.format(p))
         return contents
 
-    def ls(self, full=False):
+    def ls(self, full=False) -> None:
         """
         Print the contents of the data directory. Defaults to printing all subdirectories, but not all files.
 
         Args:
             full: Whether to print all files.
 
-        Returns:
+        Returns: prints!
 
         """
-        contents_ls_tree = self.build_ls_tree(full=full)
-        self.print_ls_tree(contents_ls_tree)
+        contents_ls_tree = self._build_ls_tree(full=full)
+        self._print_ls_tree(contents_ls_tree)
 
-    def build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
+    def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
         """
         Recursively navigate the data directory tree and build a dictionary summarizing its contents.
         All subdirectories are added to the ls_tree dictionary.
@@ -139,16 +167,14 @@ class DataDirectory:
         """
         contents_ls_tree = []
 
-        if len(self.contents) == 0:
-            contents_ls_tree = self.name
-        else:
+        if len(self.contents) > 0:
             contains_subdirs = any([not self.contents[c].is_file() for c in self.contents])
             if contains_subdirs or full or (top_dir and not contains_subdirs):
                 # build all directories first
                 dirs = [self.contents[item] for item in self.contents if not self.contents[item].is_file()]
                 dirs_sorted = sorted(dirs, key=lambda k: k.name)
                 for d in dirs_sorted:
-                    contents_ls_tree.append(d.build_ls_tree(full=full, top_dir=False))
+                    contents_ls_tree.append(d._build_ls_tree(full=full, top_dir=False))
 
                 # ... then collect all files
                 files = [self.contents[item] for item in self.contents if self.contents[item].is_file()]
@@ -160,9 +186,9 @@ class DataDirectory:
 
         return {self.name: contents_ls_tree}
 
-    def print_ls_tree(self, ls_tree: Dict[str, List], indent: int = 0) -> None:
+    def _print_ls_tree(self, ls_tree: Dict[str, List], indent: int = 0) -> None:
         """
-        Recursively print the ls_tree dictionary as created by `build_ls_tree`.
+        Recursively print the ls_tree dictionary as created by `_build_ls_tree`.
         Args:
             ls_tree: Dict describing a DataDirectory contents.
             indent: indent level to print with at the current level of recursion.
@@ -180,7 +206,126 @@ class DataDirectory:
                 else:
                     print('{}{}/'.format(' ' * 4 * indent, key))
                     for item in contents:
-                        self.print_ls_tree(item, indent+1)
+                        self._print_ls_tree(item, indent+1)
+
+
+class TransformedDataDirectory(DataDirectory):
+    """Manages interacting with the file expression of TransformedData, which is:
+    transformed_data_<date>_<git_hash>_<tag>/
+        data.xxx
+        func.dill
+        code.txt
+    """
+
+    def __init__(self, path, contents=None):
+        super().__init__(path, contents)
+
+        self.data_file = self._identify_file_from_contents(self.contents, 'data', self.path)
+        self.func_file = self._identify_file_from_contents(self.contents, 'func', self.path)
+        self.code_file = self._identify_file_from_contents(self.contents, 'code', self.path)
+
+        self.time_stamp, self.git_hash, self.tag = self._parse_transform_dir_name(self.name)
+
+    @staticmethod
+    def _identify_file_from_contents(contents: Dict[str, 'DataFile'], file_name: str, parent_dir: str) -> 'DataFile':
+        options = [contents[file] for file in contents if file_name in file]
+        if len(options) == 0:
+            raise ValueError('No {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir))
+        elif len(options) > 1:
+            raise ValueError('More than one {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir)
+                             )
+        else:
+            return options[0]
+
+    def _determine_data_type(self):
+        # This function can't use self.data_file because this function is called in super().__init__(), and
+        # self.data_file is not set until self.__init__()
+        data_type = self._identify_file_from_contents(self.contents, 'data', self.path).data_type
+        return data_type
+
+    @classmethod
+    def transform_and_save(cls, data: Any, transformer_func: Callable, tag: str, data_file_type: str, parent_path: str,
+                           enforce_clean_git=True) -> Tuple[str, 'TransformedDataDirectory']:
+        # TODO: figure out how to move this to TransformedDataInterface
+        """
+        Save a transformed dataset.
+
+        Args:
+            data: Input data to transform.
+            transformer_func: Transform function to apply to data.
+            tag: Short description of the transform being applied.
+            data_file_type: File type to save the data as
+            parent_path: The parent path at which the new TransformedDataDirectory will be created
+            enforce_clean_git: Whether to only allow the save to proceed if the working state of the git directory is
+                clean.
+
+        Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict.
+
+        """
+        # TODO: need module 'datatc.git_utilities' has no attribute 'get_repo_path'
+        # if enforce_clean_git:
+        #     git_utilities.check_for_uncommitted_git_changes()
+
+        transform_dir_name = cls._generate_name_for_transform_dir(tag)
+        new_transform_dir_path = Path(parent_path, transform_dir_name)
+        os.makedirs(new_transform_dir_path)
+
+        data_interface = DataInterfaceManager.select(data_file_type)
+        data = transformer_func(data)
+        data_interface.save(data, 'data', new_transform_dir_path)
+
+        DillDataInterface.save(transformer_func, 'func', new_transform_dir_path)
+
+        transformer_func_code = inspect.getsource(transformer_func)
+        TextDataInterface.save(transformer_func_code, 'code', new_transform_dir_path)
+
+        new_TransformedDataDirectory = TransformedDataDirectory(new_transform_dir_path)
+
+        print('created new file {}'.format(new_transform_dir_path))
+        return transform_dir_name, new_TransformedDataDirectory
+
+    def load(self, data_interface_hint=None) -> 'TransformedData':
+        """
+        Load a saved data transformer- the data and the function that generated it.
+
+        Args:
+            data_interface_hint:
+
+        Returns: Tuple(data, transformer_func)
+
+        """
+        data = self.data_file.load(data_interface_hint=data_interface_hint)
+        transformer_func = self.func_file.load()
+        transformer_code = self.code_file.load()
+        return TransformedData(data, transformer_func, transformer_code)
+
+    @classmethod
+    def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
+        repo_path = git_utilities.get_repo_path()
+        git_hash = git_utilities.get_git_hash(repo_path)
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        delimiter_char = '__'
+        file_name_components = ['transformed_data_dir', timestamp, git_hash]
+        if tag is not None:
+            file_name_components.append(tag)
+        return delimiter_char.join(file_name_components)
+
+    @classmethod
+    def _parse_transform_dir_name(cls, name) -> Tuple[str, str, str]:
+        delimiter_char = '__'
+        file_name_components = name.split(delimiter_char)
+        if len(file_name_components) == 3:
+            denoter, timestamp, git_hash = file_name_components
+            tag = ''
+        elif len(file_name_components) == 4:
+            denoter, timestamp, git_hash, tag = file_name_components
+        else:
+            raise ValueError('TransformedDataDirectory name could not be parsed: {}'.format(name))
+        return timestamp, git_hash, tag
+
+    def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
+        ls_description = '{}.{}'.format(self.tag, self.data_type)
+        return {ls_description: []}
 
 
 class DataFile(DataDirectory):
@@ -202,23 +347,6 @@ class DataFile(DataDirectory):
             return 'unknown'
 
     def load(self, data_interface_hint=None):
-        if data_interface_hint is None:
-            data_interface = DataInterfaceManager.select(self.data_type)
-        else:
-            data_interface = DataInterfaceManager.select(data_interface_hint)
-        print('Loading {}'.format(self.path))
-        return data_interface.load(self.path)
-
-
-class TransformedDataFile(DataFile):
-
-    def __init__(self, path, contents=None):
-        super().__init__(path, contents)
-
-    def _determine_data_type(self):
-        return 'transformed data'
-
-    def load(self, data_interface_hint=None) -> TransformedData:
         if data_interface_hint is None:
             data_interface = DataInterfaceManager.select(self.data_type)
         else:

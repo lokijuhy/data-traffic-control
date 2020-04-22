@@ -1,10 +1,15 @@
+import datetime
 import inspect
-import glob
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Dict, Tuple
 
 from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
+from datatc import git_utilities
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from datatc.data_directory import DataDirectory, TransformedDataDirectory, DataFile
 
 
 class TransformedData:
@@ -28,96 +33,120 @@ class TransformedData:
         return self.transformer_func(*args, **kwargs)
 
     def view_code(self):
-        return self.code
+        print(self.code)
+
+    @classmethod
+    def save(cls, data: Any, transformer_func: Callable, data_directory: 'DataDirectory', file_name: str,
+             enforce_clean_git=True) -> Path:
+        """
+        Alternative public method for saving a TransformedData.
+
+        Example Usage:
+            dm = DataManager('path')
+            fe_dir = dm['feature_engineering']
+
+            TransformedData.save(df, transformer, fe_dir, 'v2.csv')
+        """
+        return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git)
+
+    @classmethod
+    def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None) -> 'TransformedData':
+        """
+        Alternative public method for loading a TransformedData.
+
+        Example Usage:
+            dm = DataManager('path')
+            fe_dir = dm['feature_engineering'].latest()
+            TransformedData.load(fe_dir)
+        """
+        return TransformedDataInterface.load(transformed_data_dir, data_interface_hint)
 
 
 class TransformedDataInterface:
 
-    def __init__(self):
-        self.data_designation = '_data'
-        self.transformer_data_interface = DillDataInterface
-        self.func_designation = '_func'
-        self.transformer_func_interface = TextDataInterface
+    data_file_name = '_data'
 
-    def save(self, data: Any, transformer_func: Callable, file_name: str, data_file_type: str, file_dir_path: str):
-        """
+    func_file_name = 'func'
+    func_interface = DillDataInterface
 
-        Args:
-            data:
-            transformer_func:
-            file_name:
-            data_file_type:
-            file_dir_path:
+    code_file_name = 'code'
+    code_interface = TextDataInterface
 
-        Returns:
+    @classmethod
+    def save(cls, data: Any, transformer_func: Callable, data_directory: 'DataDirectory', file_name: str,
+             enforce_clean_git=True) -> Path:
+        if enforce_clean_git:
+            git_utilities.check_for_uncommitted_git_changes()
 
-        """
-        if self.check_name_already_exists(file_name, file_dir_path):
-            raise ValueError("That data transformer name is already in use")
+        tag, data_file_type = os.path.splitext(file_name)
+        transform_dir_name = cls._generate_name_for_transform_dir(tag)
+        new_transform_dir_path = Path(data_directory.path, transform_dir_name)
+        os.makedirs(new_transform_dir_path)
 
         data_interface = DataInterfaceManager.select(data_file_type)
         data = transformer_func(data)
-        data_interface.save(data, file_name, file_dir_path)
-        self.transformer_data_interface.save(transformer_func, file_name+self.data_designation, file_dir_path)
-        transformer_func_code = inspect.getsource(transformer_func)
-        self.transformer_func_interface.save(transformer_func_code, file_name+self.func_designation, file_dir_path)
+        data_interface.save(data, 'data', new_transform_dir_path)
 
-    def load(self, file_name: str, file_dir_path: str) -> TransformedData:
+        cls.func_interface.save(transformer_func, 'func', new_transform_dir_path)
+
+        transformer_func_code = inspect.getsource(transformer_func)
+        cls.code_interface.save(transformer_func_code, 'code', new_transform_dir_path)
+
+        print('created new file {}'.format(new_transform_dir_path))
+        return new_transform_dir_path
+
+    @classmethod
+    def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None) -> 'TransformedData':
         """
-        Load a cached data transformer- the data and the function that generated it.
-        Accepts a file name with or without a file extension.
+        Load a saved data transformer- the data and the function that generated it.
 
         Args:
-            file_name: The base name of the data file. May include the file extension, otherwise the file extension
-                will be deduced.
-            file_dir_path: the path to the directory where cached data transformers are stored.
+            transformed_data_dir: The TransformedDataDirectory that contains the file contents of the TransformedData
+            data_interface_hint: Optional, what data interface to use to read the data file.
 
         Returns: Tuple(data, transformer_func)
 
         """
-        data_file_extension = None
-        if '.' in file_name:
-            file_name, data_file_extension = file_name.split('.')
+        data_file = cls._identify_file_from_contents(transformed_data_dir.contents, 'data', transformed_data_dir.path)
+        func_file = cls._identify_file_from_contents(transformed_data_dir.contents, 'func', transformed_data_dir.path)
+        code_file = cls._identify_file_from_contents(transformed_data_dir.contents, 'code', transformed_data_dir.path)
 
-        # load the transformer
-        transformer_func = self.transformer_data_interface.load(file_name+self.data_designation, file_dir_path)
+        data = data_file.load(data_interface_hint=data_interface_hint)
+        transformer_func = func_file.load()
+        transformer_code = code_file.load()
+        return TransformedData(data, transformer_func, transformer_code)
 
-        # load the data
-        code = self.transformer_func_interface.load(file_name+self.func_designation, file_dir_path)
+    @classmethod
+    def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
+        repo_path = git_utilities.get_repo_path()
+        git_hash = git_utilities.get_git_hash(repo_path)
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        delimiter_char = '__'
+        file_name_components = ['transformed_data_dir', timestamp, git_hash]
+        if tag is not None:
+            file_name_components.append(tag)
+        return delimiter_char.join(file_name_components)
 
-        # find and load the data
-        if data_file_extension is None:
-            data_file_extension = self.get_data_transformer_data_type(file_name, file_dir_path)
-        data_interface = DataInterfaceManager.select(data_file_extension)
-        data = data_interface.load(file_name, file_dir_path)
-        return TransformedData(data, transformer_func, code)
-
-    def check_name_already_exists(self, file_name, file_dir_path):
-        existing_data_transformers = self.list_saved_data_transformers(file_dir_path)
-        if file_name in existing_data_transformers:
-            return True
+    @classmethod
+    def _parse_transform_dir_name(cls, name) -> Tuple[str, str, str]:
+        delimiter_char = '__'
+        file_name_components = name.split(delimiter_char)
+        if len(file_name_components) == 3:
+            denoter, timestamp, git_hash = file_name_components
+            tag = ''
+        elif len(file_name_components) == 4:
+            denoter, timestamp, git_hash, tag = file_name_components
         else:
-            return False
+            raise ValueError('TransformedDataDirectory name could not be parsed: {}'.format(name))
+        return timestamp, git_hash, tag
 
     @staticmethod
-    def get_data_transformer_data_type(file_name, file_dir_path):
-        data_path = Path("{}/{}.*".format(file_dir_path, file_name))
-        transformer_files = glob.glob(data_path.__str__())
-
-        if len(transformer_files) == 0:
-            raise ValueError("No data file found for transformer {}".format(file_name))
-        elif len(transformer_files) > 1:
-            raise ValueError("Something went wrong- there's more than one file that matches this transformer name: "
-                             "{}".format("\n - ".join(transformer_files)))
-
-        data_file = transformer_files[0]
-        data_file_extension = os.path.basename(data_file).split('.')[1]
-        return data_file_extension
-
-    def list_saved_data_transformers(self, file_dir_path: str):
-        # glob for all transformer files
-        transformers_path = Path("{}/*{}.{}".format(file_dir_path, self.data_designation,
-                                                    self.transformer_data_interface.file_extension))
-        transformer_files = glob.glob(transformers_path.__str__())
-        transformer_names = [os.path.basename(file).split('.')[0] for file in transformer_files]
-        return transformer_names
+    def _identify_file_from_contents(contents: Dict[str, 'DataFile'], file_name: str, parent_dir: str) -> 'DataFile':
+        options = [contents[file] for file in contents if file_name in file]
+        if len(options) == 0:
+            raise ValueError('No {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir))
+        elif len(options) > 1:
+            raise ValueError('More than one {} file found for TransformedDataDirectory {}'.format(file_name, parent_dir)
+                             )
+        else:
+            return options[0]

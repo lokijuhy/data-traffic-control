@@ -14,16 +14,19 @@ class DataInterfaceBase:
     file_extension = None
 
     @classmethod
-    def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = 'w') -> None:
+    def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = None) -> None:
         file_path = cls.construct_file_path(file_name, file_dir_path)
-        return cls._interface_specific_save(data, file_path, mode)
+        if mode is None:
+            return cls._interface_specific_save(data, file_path)
+        else:
+            return cls._interface_specific_save(data, file_path, mode)
 
     @classmethod
     def construct_file_path(cls, file_name: str, file_dir_path: str) -> str:
         return str(Path(file_dir_path, "{}.{}".format(file_name, cls.file_extension)))
 
     @classmethod
-    def _interface_specific_save(cls, data: Any, file_path, mode) -> None:
+    def _interface_specific_save(cls, data: Any, file_path, mode: str = None) -> None:
         raise NotImplementedError
 
     @classmethod
@@ -147,6 +150,7 @@ class DataInterfaceManager:
     file_extension = None
     registered_interfaces = {
         'pkl': PickleDataInterface,
+        'dill': DillDataInterface,
         'csv': CSVDataInterface,
         'xlsx': ExcelDataInterface,
         'txt': TextDataInterface,

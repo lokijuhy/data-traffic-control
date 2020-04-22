@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Dict
 import yaml
 
-from datatc import data_processor
 from datatc.data_directory import DataDirectory
 
 CONFIG_FILE_NAME = '.data_map.yaml'
@@ -27,7 +26,6 @@ class DataManager:
         """
         self.data_path = self._identify_data_path(path_hint)
         self.data_directory = DataDirectory(self.data_path.__str__())
-        self.DataProcessorCacheManager = data_processor.DataProcessorCacheManager()
 
     def reload(self):
         self.data_directory = DataDirectory(self.data_path)
@@ -98,8 +96,8 @@ class DataManager:
 
     def _load_config(self) -> Dict:
         """Load the config file. If config file is empty, return an empty dict."""
+        config_path = Path(Path.home(), CONFIG_FILE_NAME)
         if self._config_exists():
-            config_path = Path(Path.home(), CONFIG_FILE_NAME)
             config = yaml.safe_load(open(config_path.__str__()))
             if config is None:
                 config = {}
@@ -189,83 +187,3 @@ class DataManager:
         raise ValueError("Provided hint '{}' is not registered and is not a valid path. "
                          "\n\nRegister your project with `DataManager.register_project(project_hint, project_path)`"
                          "".format(path_hint))
-
-    # --- everything below this line probably belongs in some other class --------------------------------------------
-
-    # @staticmethod
-    # def get_repo_path():
-    #     """
-    #     Get the path to the parent dir of the git repo containing this file.
-    #     TODO: how get the git directory of the code directory that is calling/subclassing DataManager?
-    #
-    #     Returns: str.
-    #
-    #     """
-    #     return os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-    #
-    # @classmethod
-    # def check_for_uncommitted_git_changes(cls):
-    #     repo_path = cls.get_repo_path()
-    #     return gu.check_for_uncommitted_git_changes_at_path(repo_path)
-    #
-    # @classmethod
-    # def generate_filename_for_file(cls, tag: str = None) -> str:
-    #     repo_path = cls.get_repo_path()
-    #     git_hash = gu.get_git_hash(repo_path)
-    #     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    #     if tag:
-    #         filename = "{}_{}_{}".format(timestamp, git_hash, tag)
-    #     else:
-    #         filename = "{}_{}".format(timestamp, git_hash)
-    #     return filename
-    #
-    # def cache_data_processor(self, data: Any, processing_func: Callable, tag: str = None, data_file_type='pkl',
-    #                          enforce_clean_git=True) -> str:
-    #     """
-    #     Run and save the results of a data processing step. Saves the processing logic alongside the output, so that
-    #     the data can be reproduced.
-    #
-    #     Args:
-    #         data: input data for processing_func
-    #         processing_func: The data transformation function to apply and save the results of
-    #         tag: short description to put in the file names
-    #         data_file_type: File type to use for the saved data
-    #         enforce_clean_git: Whether to only allow execution if the git state of the repo is clean.
-    #
-    #     Returns: File name of saved data file.
-    #
-    #     Raises: RuntimeError if git repo is in an unclean state.
-    #
-    #     """
-    #     if enforce_clean_git:
-    #         self.check_for_uncommitted_git_changes()
-    #
-    #     file_name = self.generate_filename_for_file(tag)
-    #     file_data_path = Path(self.data_path, "data/transformed_data")
-    #     self.DataProcessorCacheManager.save(data, processing_func, file_name=file_name, data_file_type=data_file_type,
-    #                                         file_dir_path=file_data_path)
-    #     return file_name
-    #
-    # def load_cached_data_processor(self, file_name: str) -> 'DataProcessor':
-    #     file_data_path = Path(self.data_path, "data/transformed_data")
-    #     return self.DataProcessorCacheManager.load(file_name=file_name, file_dir_path=file_data_path)
-    #
-    # def load_most_recent(self, sub_path):
-    #     """Load the most recent pickled data dictionary from the data/transformed directory,
-    #     as determined by the timestamp in the filename. """
-    #
-    #     filepath = Path(self.data_path, '{}/*'.format(sub_path))
-    #     files = glob.glob(filepath.__str__())
-    #
-    #     if len(files) == 0:
-    #         # TODO: make this raise some kind of error
-    #         print("ERROR: no files found at {}".format(filepath))
-    #         return
-    #
-    #     filenames = [os.path.basename(file) for file in files]
-    #     filenames.sort()
-    #     chosen_one = filenames[-1]
-    #     print("Loading {}".format(chosen_one))
-    #     return self.magic_load(sub_path, chosen_one)
-    #
-    #

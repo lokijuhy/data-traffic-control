@@ -223,7 +223,7 @@ class TransformedDataDirectory(DataDirectory):
         return TransformedDataInterface.load(self.path, data_interface_hint)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
-        info = TransformedDataInterface.get_info(self.path)['data_type']
+        info = TransformedDataInterface.get_info(self.path)
         ls_description = '{}.{}'.format(info['tag'], info['data_type'])
         return {ls_description: []}
 

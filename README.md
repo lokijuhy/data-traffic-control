@@ -104,6 +104,47 @@ raw_df = dm['data_extracts'].latest().select('xlsx').load()
 
 If you ever want to do your own load, and not use the build in `.load()`, you can also use `dm[...]['filename'].path` to get the path to the file for use in a separate loading operation.
 
+
+## Saving and Loading SavedDataTransforms
+`datatc` helps you remember how your datasets were generated. 
+Anytime you want `datatc` to help keep track of what transform function was used to create a dataset,
+pass that transform function and the input data to `.save()`, like this: 
+
+`.save(input_data, output_file, transform_func)`.
+
+`datatc` will run the transform func on your input data, and save not only the resulting dataset,
+ but also metadata about how the dataset was generated. 
+ 
+ Here's a toy example:
+
+```python
+def my_transform(df):
+    df['new_feature'] = df['input_column'] * 2
+    return df
+
+dm['feature_sets'].save(input_df, 'my_feature_set.csv', my_transform)
+```
+This uses `datatc`'s Saved Data Transform functionality to save a dataset and the code that generated it.
+This line of code:
+  * consumes `input_df`
+  * applies `my_transform`
+  * saves the result as `my_feature_set.csv`
+  * also stamps the code contained in `my_transform` alongside the dataset for easy future reference
+
+Afterwords, you can not only load the dataset, but also view and re-use the code that generated that dataset:
+```python
+sdt = dm['feature_sets'].latest().load()
+
+# view and use the data
+sdt.data.head()
+
+# view the code that generated the dataset
+sdt.view_code()
+
+# rerun the transform on a new dataset
+more_transformed_df = sdt.rerun(new_df)
+```
+
 ## Working with File Types via `DataInterface`
 
 `DataInterface` provides a standard interface for interacting with all file types: `save()` and `load()`. This abstracts away the exact saving and loading operations for specific file types.

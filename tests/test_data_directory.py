@@ -10,27 +10,27 @@ class TestDataDirectory(unittest.TestCase):
         file1 = DataFile(path='file1.txt', contents={})
         data_dir = DataDirectory('top', contents={'file1.txt': file1})
         expected_result = {'top': ['file1.txt']}
-        self.assertEqual(data_dir.build_ls_tree(), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(), expected_result)
 
     def test_ls_one_file_full(self):
         file1 = DataFile(path='file1.txt', contents={})
         data_dir = DataDirectory('top', contents={'file1.txt': file1})
         expected_result = {'top': ['file1.txt']}
-        self.assertEqual(data_dir.build_ls_tree(full=True), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(full=True), expected_result)
 
     def test_ls_two_same_type_files(self):
         file1 = DataFile(path='file1.txt', contents={})
         file2 = DataFile(path='file2.txt', contents={})
         data_dir = DataDirectory('top', contents={'file1.txt': file1, 'file2.txt': file2})
         expected_result = {'top': ['file1.txt', 'file2.txt']}
-        self.assertEqual(data_dir.build_ls_tree(), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(), expected_result)
 
     def test_ls_two_same_type_files_full(self):
         file1 = DataFile(path='file1.txt', contents={})
         file2 = DataFile(path='file2.txt', contents={})
         data_dir = DataDirectory('top', contents={'file1.txt': file1, 'file2.txt': file2})
         expected_result = {'top': ['file1.txt', 'file2.txt']}
-        self.assertEqual(data_dir.build_ls_tree(full=True), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(full=True), expected_result)
 
     def test_ls_one_file_in_subdir(self):
         file1 = DataFile(path='file1.txt', contents={})
@@ -41,7 +41,7 @@ class TestDataDirectory(unittest.TestCase):
                 '1 txt items']
             }
         ]}
-        self.assertEqual(data_dir.build_ls_tree(), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(), expected_result)
 
     def test_ls_one_file_full_in_subdir(self):
         file1 = DataFile(path='file1.txt', contents={})
@@ -52,7 +52,7 @@ class TestDataDirectory(unittest.TestCase):
                 'file1.txt'
             ]}
         ]}
-        self.assertEqual(data_dir.build_ls_tree(full=True), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(full=True), expected_result)
 
     def test_ls_two_same_type_files_in_subdir(self):
         file1 = DataFile(path='file1.txt', contents={})
@@ -64,7 +64,7 @@ class TestDataDirectory(unittest.TestCase):
                 '2 txt items'
             ]}
         ]}
-        self.assertEqual(data_dir.build_ls_tree(), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(), expected_result)
 
     def test_ls_two_same_type_files_full_in_subdir(self):
         file1 = DataFile(path='file1.txt', contents={})
@@ -79,7 +79,21 @@ class TestDataDirectory(unittest.TestCase):
             ]}
         ]}
 
-        self.assertEqual(data_dir.build_ls_tree(full=True), expected_result)
+        self.assertEqual(data_dir._build_ls_tree(full=True), expected_result)
+
+    def test_ls_empty_top_dir(self):
+        data_dir = DataDirectory('empty_dir', contents={})
+        expected_result = {'empty_dir': []}
+        self.assertEqual(data_dir._build_ls_tree(), expected_result)
+
+    def test_ls_empty_sub_dir(self):
+        data_dir = DataDirectory('empty_dir', contents={})
+        top_dir = DataDirectory('top_dir', contents={'empty_dir': data_dir})
+        expected_result = {'top_dir': [
+            {'empty_dir': []
+             }
+        ]}
+        self.assertEqual(top_dir._build_ls_tree(), expected_result)
 
     # === SELECT ===
     def test_select_hint_one_exact_match_one_fuzzy_match(self):

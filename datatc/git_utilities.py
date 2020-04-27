@@ -1,4 +1,5 @@
 from git import Repo
+import inspect
 import os
 import subprocess
 
@@ -48,3 +49,7 @@ def check_for_uncommitted_git_changes_at_path(repo_path: str) -> bool:
                            '\nCommit them before proceeding. '.format(', '.join(changed_files)))
 
     return False
+
+
+def get_repo_path():
+    return os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))

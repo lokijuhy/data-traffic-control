@@ -1,9 +1,10 @@
 import glob
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Callable, Dict, List
 
 from datatc.data_interface import DataInterfaceManager
+from datatc.data_transformer import TransformedData, TransformedDataInterface
 
 
 DIRS_TO_IGNORE = ['__pycache__']
@@ -78,8 +79,28 @@ class DataDirectory:
         latest_content = sorted_contents[-1]
         return self.contents[latest_content]
 
+    def save(self, data: Any, file_name: str, transformer_func: Callable = None, enforce_clean_git: bool = True
+             ) -> None:
+
+        if transformer_func is None:
+            self.save_file(data, file_name)
+        else:
+            self.transform_and_save(data, transformer_func, file_name, enforce_clean_git)
+
+    def save_file(self, data: Any, file_name: str) -> None:
+        data_interface = DataInterfaceManager.select(file_name)
+        data_interface.save(data, file_name, self.path)
+        self.contents[file_name] = DataFile(Path(self.path, file_name))
+
+    def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True) -> None:
+        new_transform_dir_path = TransformedDataInterface.save(data, transformer_func, parent_path=self.path,
+                                                               file_name=file_name, enforce_clean_git=enforce_clean_git)
+        base_name = os.path.basename(new_transform_dir_path)
+        self.contents[base_name] = TransformedDataDirectory(new_transform_dir_path)
+        return
+
     def load(self):
-        raise NotImplementedError("I haven't gotten to this yet!")
+        raise NotImplementedError("Loading the entire contents of a directory has not yet been implemented!")
 
     @staticmethod
     def _characterize_dir(path) -> Dict[str, 'DataDirectory']:
@@ -101,27 +122,30 @@ class DataDirectory:
             if name in DIRS_TO_IGNORE:
                 continue
             if os.path.isdir(p):
-                contents[name] = DataDirectory(p)
+                if 'transformed_data_dir' in p:
+                    contents[name] = TransformedDataDirectory(p)
+                else:
+                    contents[name] = DataDirectory(p)
             elif os.path.isfile(p):
                 contents[name] = DataFile(p)
             else:
                 print('WARNING: {} is neither a file nor a directory.'.format(p))
         return contents
 
-    def ls(self, full=False):
+    def ls(self, full=False) -> None:
         """
         Print the contents of the data directory. Defaults to printing all subdirectories, but not all files.
 
         Args:
             full: Whether to print all files.
 
-        Returns:
+        Returns: prints!
 
         """
-        contents_ls_tree = self.build_ls_tree(full=full)
-        self.print_ls_tree(contents_ls_tree)
+        contents_ls_tree = self._build_ls_tree(full=full)
+        self._print_ls_tree(contents_ls_tree)
 
-    def build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
+    def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
         """
         Recursively navigate the data directory tree and build a dictionary summarizing its contents.
         All subdirectories are added to the ls_tree dictionary.
@@ -138,16 +162,14 @@ class DataDirectory:
         """
         contents_ls_tree = []
 
-        if len(self.contents) == 0:
-            contents_ls_tree = self.name
-        else:
+        if len(self.contents) > 0:
             contains_subdirs = any([not self.contents[c].is_file() for c in self.contents])
             if contains_subdirs or full or (top_dir and not contains_subdirs):
                 # build all directories first
                 dirs = [self.contents[item] for item in self.contents if not self.contents[item].is_file()]
                 dirs_sorted = sorted(dirs, key=lambda k: k.name)
                 for d in dirs_sorted:
-                    contents_ls_tree.append(d.build_ls_tree(full=full, top_dir=False))
+                    contents_ls_tree.append(d._build_ls_tree(full=full, top_dir=False))
 
                 # ... then collect all files
                 files = [self.contents[item] for item in self.contents if self.contents[item].is_file()]
@@ -159,9 +181,9 @@ class DataDirectory:
 
         return {self.name: contents_ls_tree}
 
-    def print_ls_tree(self, ls_tree: Dict[str, List], indent: int = 0) -> None:
+    def _print_ls_tree(self, ls_tree: Dict[str, List], indent: int = 0) -> None:
         """
-        Recursively print the ls_tree dictionary as created by `build_ls_tree`.
+        Recursively print the ls_tree dictionary as created by `_build_ls_tree`.
         Args:
             ls_tree: Dict describing a DataDirectory contents.
             indent: indent level to print with at the current level of recursion.
@@ -179,7 +201,31 @@ class DataDirectory:
                 else:
                     print('{}{}/'.format(' ' * 4 * indent, key))
                     for item in contents:
-                        self.print_ls_tree(item, indent+1)
+                        self._print_ls_tree(item, indent+1)
+
+
+class TransformedDataDirectory(DataDirectory):
+    """Manages interacting with the file expression of TransformedData, which is:
+    transformed_data_<date>_<git_hash>_<tag>/
+        data.xxx
+        func.dill
+        code.txt
+    """
+
+    def __init__(self, path, contents=None):
+        super().__init__(path, contents)
+
+    def _determine_data_type(self):
+        return TransformedDataInterface.get_info(self.path)['data_type']
+
+    def load(self, data_interface_hint=None) -> 'TransformedData':
+        """Load a saved data transformer- the data and the function that generated it."""
+        return TransformedDataInterface.load(self.path, data_interface_hint)
+
+    def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
+        info = TransformedDataInterface.get_info(self.path)
+        ls_description = '{}.{}'.format(info['tag'], info['data_type'])
+        return {ls_description: []}
 
 
 class DataFile(DataDirectory):
@@ -199,11 +245,6 @@ class DataFile(DataDirectory):
             return ext.replace('.', '')
         else:
             return 'unknown'
-
-    @staticmethod
-    def _characterize_dir(path) -> Dict:
-        """A file has no sub contents"""
-        return {}
 
     def load(self, data_interface_hint=None):
         if data_interface_hint is None:

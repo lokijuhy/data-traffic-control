@@ -218,9 +218,9 @@ class TransformedDataDirectory(DataDirectory):
     def _determine_data_type(self):
         return TransformedDataInterface.get_info(self.path)['data_type']
 
-    def load(self, data_interface_hint=None) -> 'TransformedData':
+    def load(self, data_interface_hint=None, load_function: bool = True) -> 'TransformedData':
         """Load a saved data transformer- the data and the function that generated it."""
-        return TransformedDataInterface.load(self.path, data_interface_hint)
+        return TransformedDataInterface.load(self.path, data_interface_hint, load_function)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
         info = TransformedDataInterface.get_info(self.path)

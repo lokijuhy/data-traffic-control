@@ -145,6 +145,14 @@ sdt.view_code()
 more_transformed_df = sdt.rerun(new_df)
 ```
 
+If the Saved Data Transform is moved to a different environment where the dependencies for the code transform are not met,
+use
+
+    sdt = TransformedDataDirectory.load(load_function=False)
+
+to avoid a `ModuleNotFoundError`.
+
+
 ## Working with File Types via `DataInterface`
 
 `DataInterface` provides a standard interface for interacting with all file types: `save()` and `load()`. This abstracts away the exact saving and loading operations for specific file types.

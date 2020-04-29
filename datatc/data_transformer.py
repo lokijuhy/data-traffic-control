@@ -31,7 +31,10 @@ class TransformedData:
         return self.transformer_func
 
     def rerun(self, *args, **kwargs):
-        return self.transformer_func(*args, **kwargs)
+        if self.transformer_func is not None:
+            return self.transformer_func(*args, **kwargs)
+        else:
+            raise ValueError('TransformedData Function was not loaded')
 
     def view_code(self):
         print(self.code)
@@ -108,13 +111,15 @@ class TransformedDataInterface:
         return new_transform_dir_path
 
     @classmethod
-    def load(cls, path: str, data_interface_hint=None) -> 'TransformedData':
+    def load(cls, path: str, data_interface_hint=None, load_function: bool = True) -> 'TransformedData':
         """
         Load a saved data transformer- the data and the function that generated it.
 
         Args:
             path: The path to the directory that contains the file contents of the TransformedData
             data_interface_hint: Optional, what data interface to use to read the data file.
+            load_function: Whether to load the dill'ed function. May want to not load if dependencies are not present in
+             current environment, which would cause a ModuleNotFoundError.
 
         Returns: Tuple(data, transformer_func)
 
@@ -126,7 +131,10 @@ class TransformedDataInterface:
 
         data_interface = DataInterfaceManager.select(data_file, default_file_type=data_interface_hint)
         data = data_interface.load(data_file)
-        transformer_func = cls.file_component_interfaces['func'].load(func_file)
+        if load_function:
+            transformer_func = cls.file_component_interfaces['func'].load(func_file)
+        else:
+            transformer_func = None
         transformer_code = cls.file_component_interfaces['code'].load(code_file)
         return TransformedData(data, transformer_func, transformer_code)
 

@@ -94,10 +94,11 @@ class DataManager:
         else:
             return False
 
-    def _load_config(self) -> Dict:
+    @classmethod
+    def _load_config(cls) -> Dict:
         """Load the config file. If config file is empty, return an empty dict."""
         config_path = Path(Path.home(), CONFIG_FILE_NAME)
-        if self._config_exists():
+        if cls._config_exists():
             config = yaml.safe_load(open(config_path.__str__()))
             if config is None:
                 config = {}

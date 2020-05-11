@@ -3,6 +3,10 @@ Whhrrrr... Voooooosh... That's the sound of your data coming and going exactly w
 
 ## Usage
 
+### Installation
+
+Clone this repo, `cd` into the newly created `data-traffic-control` directory, and run `pip install -e .` to install the `datatc` package.
+
 ### Import
 
 ```python

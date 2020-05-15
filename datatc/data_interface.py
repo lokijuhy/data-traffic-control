@@ -99,7 +99,7 @@ class CSVDataInterface(DataInterfaceBase):
 
     @classmethod
     def _interface_specific_save(cls, data, file_path, mode=None):
-        data.to_csv(file_path)
+        data.to_csv(file_path, index=False)
 
     @classmethod
     def _interface_specific_load(cls, file_path):

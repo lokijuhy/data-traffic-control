@@ -222,9 +222,12 @@ class TransformedDataDirectory(DataDirectory):
         """Load a saved data transformer- the data and the function that generated it."""
         return TransformedDataInterface.load(self.path, data_interface_hint, load_function)
 
+    def get_info(self):
+        return TransformedDataInterface.get_info(self.path)
+
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
         info = TransformedDataInterface.get_info(self.path)
-        ls_description = '{}.{}'.format(info['tag'], info['data_type'])
+        ls_description = '{}.{}  ({})'.format(info['tag'], info['data_type'], info['timestamp'])
         return {ls_description: []}
 
 

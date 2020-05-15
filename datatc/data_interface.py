@@ -40,7 +40,7 @@ class DataInterfaceBase:
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(file_path)
-        return cls._interface_specific_load(file_path)
+        return cls._interface_specific_load(str(file_path))
 
     @classmethod
     def _interface_specific_load(cls, file_path) -> Any:
@@ -151,6 +151,7 @@ class YAMLDataInterface(DataInterfaceBase):
 
 
 class TestingDataInterface(DataInterfaceBase):
+    """Test class that doesn't make interactions with the file system, for use in unit tests"""
 
     file_extension = 'test'
 
@@ -174,6 +175,8 @@ class DataInterfaceManager:
         'sql': TextDataInterface,
         'pdf': PDFDataInterface,
         'yaml': YAMLDataInterface,
+
+        # for unit testing purposes only
         'test': TestingDataInterface,
     }
 

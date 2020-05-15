@@ -2,6 +2,7 @@ import pandas as pd
 from pathlib import Path
 import pickle
 import dill
+import os
 from typing import Any
 import yaml
 
@@ -14,16 +15,21 @@ class DataInterfaceBase:
     file_extension = None
 
     @classmethod
-    def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = None) -> None:
+    def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = None) -> str:
         file_path = cls.construct_file_path(file_name, file_dir_path)
         if mode is None:
-            return cls._interface_specific_save(data, file_path)
+            cls._interface_specific_save(data, file_path)
         else:
-            return cls._interface_specific_save(data, file_path, mode)
+            cls._interface_specific_save(data, file_path, mode)
+        return file_path
 
     @classmethod
     def construct_file_path(cls, file_name: str, file_dir_path: str) -> str:
-        return str(Path(file_dir_path, "{}.{}".format(file_name, cls.file_extension)))
+        root, ext = os.path.splitext(file_name)
+        if ext == '':
+            return str(Path(file_dir_path, "{}.{}".format(file_name, cls.file_extension)))
+        else:
+            return str(Path(file_dir_path, file_name))
 
     @classmethod
     def _interface_specific_save(cls, data: Any, file_path, mode: str = None) -> None:
@@ -31,7 +37,6 @@ class DataInterfaceBase:
 
     @classmethod
     def load(cls, file_path: str) -> Any:
-        # file_path = cls.construct_file_path(file_name, file_dir_path)
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(file_path)
@@ -145,9 +150,21 @@ class YAMLDataInterface(DataInterfaceBase):
         return data
 
 
+class TestingDataInterface(DataInterfaceBase):
+
+    file_extension = 'test'
+
+    @classmethod
+    def _interface_specific_save(cls, data, file_path, mode='wb+') -> None:
+        return
+
+    @classmethod
+    def _interface_specific_load(cls, file_path):
+        return {'data': 42}
+
+
 class DataInterfaceManager:
 
-    file_extension = None
     registered_interfaces = {
         'pkl': PickleDataInterface,
         'dill': DillDataInterface,
@@ -157,6 +174,7 @@ class DataInterfaceManager:
         'sql': TextDataInterface,
         'pdf': PDFDataInterface,
         'yaml': YAMLDataInterface,
+        'test': TestingDataInterface,
     }
 
     @classmethod

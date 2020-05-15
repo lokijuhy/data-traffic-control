@@ -121,3 +121,20 @@ class TestDataDirectory(unittest.TestCase):
     def test_latest_empty_dir_returns_none(self):
         data_dir = DataDirectory('top', contents={})
         self.assertEqual(data_dir.latest(), None)
+
+    # === SAVE ===
+
+    def test_save_file_adds_to_dir_contents(self):
+        initial_directory_contents = {}
+        file_name = 'file.test'
+        expected_file_path = '$HOME/{}'.format(file_name)
+        expected_directory_contents_after_save = {file_name: DataFile(expected_file_path)}
+
+        data_directory = DataDirectory(path='$HOME', contents=initial_directory_contents)
+        data_directory.save_file(42, file_name)
+
+        # check that the contents keys (the file names) are the same
+        self.assertEqual(data_directory.contents.keys(), expected_directory_contents_after_save.keys())
+        # check that the contents values are type DataFiles
+        for k in expected_directory_contents_after_save:
+            self.assertEqual(type(data_directory.contents[k]), DataFile)

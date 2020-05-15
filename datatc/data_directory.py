@@ -89,8 +89,8 @@ class DataDirectory:
 
     def save_file(self, data: Any, file_name: str) -> None:
         data_interface = DataInterfaceManager.select(file_name)
-        data_interface.save(data, file_name, self.path)
-        self.contents[file_name] = DataFile(Path(self.path, file_name))
+        saved_file_path = data_interface.save(data, file_name, self.path)
+        self.contents[file_name] = DataFile(saved_file_path)
 
     def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True) -> None:
         new_transform_dir_path = TransformedDataInterface.save(data, transformer_func, parent_path=self.path,

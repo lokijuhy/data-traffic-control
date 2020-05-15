@@ -17,10 +17,11 @@ class TransformedData:
     """A wrapper around a dataset that also contains the code that generated the data.
      TransformedData can re-run it's transformer function on a new dataset."""
 
-    def __init__(self, data, transformer_func, code):
+    def __init__(self, data: Any, transformer_func: Callable, code: str, info: Dict = None):
         self.data_set = data
         self.transformer_func = transformer_func
         self.code = code
+        self.info = info
 
     @property
     def data(self):
@@ -136,15 +137,17 @@ class TransformedDataInterface:
         else:
             transformer_func = None
         transformer_code = cls.file_component_interfaces['code'].load(code_file)
-        return TransformedData(data, transformer_func, transformer_code)
+        info = cls.get_info(path)
+        return TransformedData(data, transformer_func, transformer_code, info)
 
     @classmethod
     def get_info(cls, path: str) -> Dict[str, str]:
         timestamp, git_hash, tag = cls._parse_transform_dir_name(path)
         file_map = cls._identify_transform_sub_files(path)
         data_file_root, data_file_type = os.path.splitext(file_map['data'])
+        data_file_type = data_file_type.replace('.', '')
         return {
-            'timestamp': timestamp,
+            'timestamp': cls._parse_timestamp_for_printing(timestamp),
             'git_hash': git_hash,
             'tag': tag,
             'data_type': data_file_type
@@ -173,7 +176,7 @@ class TransformedDataInterface:
     def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
         repo_path = git_utilities.get_repo_path()
         git_hash = git_utilities.get_git_hash(repo_path)
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        timestamp = cls._generate_timestamp()
         delimiter_char = '__'
         file_name_components = ['transformed_data_dir', timestamp, git_hash]
         if tag is not None:
@@ -193,3 +196,13 @@ class TransformedDataInterface:
         else:
             raise ValueError('TransformedDataDirectory name could not be parsed: {}'.format(dir_name))
         return timestamp, git_hash, tag
+
+    @classmethod
+    def _generate_timestamp(cls):
+        return datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+    @classmethod
+    def _parse_timestamp_for_printing(cls, timestamp):
+        date, time = timestamp.split('_')
+        hours, minutes, seconds = time.split('-')
+        return '{} {}:{}'.format(date, hours, minutes)

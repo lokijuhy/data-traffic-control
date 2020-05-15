@@ -89,8 +89,8 @@ class DataDirectory:
 
     def save_file(self, data: Any, file_name: str) -> None:
         data_interface = DataInterfaceManager.select(file_name)
-        data_interface.save(data, file_name, self.path)
-        self.contents[file_name] = DataFile(Path(self.path, file_name))
+        saved_file_path = data_interface.save(data, file_name, self.path)
+        self.contents[file_name] = DataFile(saved_file_path)
 
     def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True) -> None:
         new_transform_dir_path = TransformedDataInterface.save(data, transformer_func, parent_path=self.path,
@@ -222,9 +222,12 @@ class TransformedDataDirectory(DataDirectory):
         """Load a saved data transformer- the data and the function that generated it."""
         return TransformedDataInterface.load(self.path, data_interface_hint, load_function)
 
+    def get_info(self):
+        return TransformedDataInterface.get_info(self.path)
+
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
         info = TransformedDataInterface.get_info(self.path)
-        ls_description = '{}.{}'.format(info['tag'], info['data_type'])
+        ls_description = '{}.{}  ({})'.format(info['tag'], info['data_type'], info['timestamp'])
         return {ls_description: []}
 
 

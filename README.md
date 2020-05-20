@@ -89,7 +89,7 @@ raw_df = dm['queries']['batch_query.sql'].load(data_interface_hint='txt')
 
 To help you navigate those long finicky file names, `DataManager` provides a `.select('hint')` method to search for files matching a substring. 
 
-The above example could also be access with the following command, which navigates to the extract directory and selects the xlsx file:
+The above example could also be accessed with the following command, which navigates to the latest extract directory and selects the xlsx file:
 
 ```python
 raw_df = dm['data_extracts']['2020-02-04_Extract_3months'].select('xlsx').load()
@@ -135,7 +135,7 @@ This line of code:
   * saves the result as `my_feature_set.csv`
   * also stamps the code contained in `my_transform` alongside the dataset for easy future reference
 
-Afterwords, you can not only load the dataset, but also view and re-use the code that generated that dataset:
+Afterwards, you can not only load the dataset, but also view and re-use the code that generated that dataset:
 ```python
 sdt = dm['feature_sets'].latest().load()
 

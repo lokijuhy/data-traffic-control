@@ -42,7 +42,7 @@ class TransformedData:
 
     @classmethod
     def save(cls, data: Any, transformer_func: Callable, data_directory: 'DataDirectory', file_name: str,
-             enforce_clean_git=True) -> Path:
+             enforce_clean_git: bool = True, get_git_hash_from: Any = None) -> Path:
         """
         Alternative public method for saving a TransformedData.
 
@@ -53,7 +53,8 @@ class TransformedData:
             TransformedData.save(df, transformer, fe_dir, 'v2.csv')
         """
         # TODO: convert DataDirectory to path/str
-        return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git)
+        return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git,
+                                             get_git_hash_from)
 
     @classmethod
     def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None) -> 'TransformedData':
@@ -77,9 +78,10 @@ class TransformedDataInterface:
     }
 
     @classmethod
-    def save(cls, data: Any, transformer_func: Callable, parent_path: str, file_name: str, enforce_clean_git=True)\
-            -> Path:
-        """Save a transformed dataset.
+    def save(cls, data: Any, transformer_func: Callable, parent_path: str, file_name: str, enforce_clean_git=True,
+             get_git_hash_from: Any = None) -> Path:
+        """
+        Save a transformed dataset.
 
         Args:
             data: Input data to transform.
@@ -89,9 +91,15 @@ class TransformedDataInterface:
              data as.
             enforce_clean_git: Whether to only allow the save to proceed if the working state of the git directory is
                 clean.
+            get_git_hash_from: Locally installed module from which to get git information. Use this arg if
+                transform_func is defined outside of a module tracked by git.
 
-        Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict."""
-        transformer_func_file_repo_path = get_git_repo_of_func(transformer_func)
+        Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict.
+        """
+        if get_git_hash_from:
+            transformer_func_file_repo_path = get_git_repo_of_func(get_git_hash_from)
+        else:
+            transformer_func_file_repo_path = get_git_repo_of_func(transformer_func)
         transformer_func_in_repo = True if transformer_func_file_repo_path else True
 
         if enforce_clean_git:

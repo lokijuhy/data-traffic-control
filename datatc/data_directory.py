@@ -79,22 +79,24 @@ class DataDirectory:
         latest_content = sorted_contents[-1]
         return self.contents[latest_content]
 
-    def save(self, data: Any, file_name: str, transformer_func: Callable = None, enforce_clean_git: bool = True
-             ) -> None:
+    def save(self, data: Any, file_name: str, transformer_func: Callable = None, enforce_clean_git: bool = True,
+             get_git_hash_from: Any = None) -> None:
 
         if transformer_func is None:
             self.save_file(data, file_name)
         else:
-            self.transform_and_save(data, transformer_func, file_name, enforce_clean_git)
+            self.transform_and_save(data, transformer_func, file_name, enforce_clean_git, get_git_hash_from)
 
     def save_file(self, data: Any, file_name: str) -> None:
         data_interface = DataInterfaceManager.select(file_name)
         saved_file_path = data_interface.save(data, file_name, self.path)
         self.contents[file_name] = DataFile(saved_file_path)
 
-    def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True) -> None:
+    def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True,
+                           get_git_hash_from: Any = None) -> None:
         new_transform_dir_path = TransformedDataInterface.save(data, transformer_func, parent_path=self.path,
-                                                               file_name=file_name, enforce_clean_git=enforce_clean_git)
+                                                               file_name=file_name, enforce_clean_git=enforce_clean_git,
+                                                               get_git_hash_from=get_git_hash_from)
         base_name = os.path.basename(new_transform_dir_path)
         self.contents[base_name] = TransformedDataDirectory(new_transform_dir_path)
         return

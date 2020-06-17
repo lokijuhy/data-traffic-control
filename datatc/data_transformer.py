@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
-from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_for_file
+from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ class TransformedDataInterface:
                                    'Use `enforce_clearn_git=False` to override this restriction.')
 
         tag, data_file_type = os.path.splitext(file_name)
-        git_hash = get_git_hash_for_file(transformer_func_file_repo_path) if transformer_func_in_repo else None
+        git_hash = get_git_hash(transformer_func_file_repo_path) if transformer_func_in_repo else None
         transform_dir_name = cls._generate_name_for_transform_dir(tag, git_hash)
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)

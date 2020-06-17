@@ -149,6 +149,17 @@ sdt.view_code()
 more_transformed_df = sdt.rerun(new_df)
 ```
 
+### Tracking Git Metadata
+By default, when you save a transformed dataset via a `transform_func`, `datatc` will include the git hash of the repo where `transform_func` is located.
+This workflow assumes that the `transform_func` is written in a file and imported into the active coding environment for use in a `SavedDataTransform`
+If the `transform_func` is not in a file (for example, is written on the fly in a notebook or in an interactive session),
+the user may specify the module under development to get a git hash from via `get_git_hash_from=module`.
+
+To ensure tracability, `datatc` checks that there are no uncommitted changes in the repo before proceeding with the SavedDataTransform.
+If there are uncommitted changes, `datatc` raises a `RuntimeError`. If you would like to override this check, specify ``enforce_clean_git = False`.
+
+### Loading SavedDataTransforms in dependency-incomplete environments
+
 If the Saved Data Transform is moved to a different environment where the dependencies for the code transform are not met,
 use
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
-from datatc import git_utilities
+from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_for_file
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -91,11 +91,19 @@ class TransformedDataInterface:
                 clean.
 
         Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict."""
+        transformer_func_file_repo_path = get_git_repo_of_func(transformer_func)
+        transformer_func_in_repo = True if transformer_func_file_repo_path else True
+
         if enforce_clean_git:
-            git_utilities.check_for_uncommitted_git_changes_at_path(git_utilities.get_repo_path())
+            if transformer_func_in_repo:
+                check_for_uncommitted_git_changes_at_path(transformer_func_file_repo_path)
+            else:
+                raise RuntimeError('`transformer_func` is not tracked in a git repo.'
+                                   'Use `enforce_clearn_git=False` to override this restriction.')
 
         tag, data_file_type = os.path.splitext(file_name)
-        transform_dir_name = cls._generate_name_for_transform_dir(tag)
+        git_hash = get_git_hash_for_file(transformer_func_file_repo_path) if transformer_func_in_repo else None
+        transform_dir_name = cls._generate_name_for_transform_dir(tag, git_hash)
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
@@ -173,9 +181,7 @@ class TransformedDataInterface:
             return options[0]
 
     @classmethod
-    def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
-        repo_path = git_utilities.get_repo_path()
-        git_hash = git_utilities.get_git_hash(repo_path)
+    def _generate_name_for_transform_dir(cls, tag: str = None, git_hash: str = None) -> str:
         timestamp = cls._generate_timestamp()
         delimiter_char = '__'
         file_name_components = ['transformed_data_dir', timestamp, git_hash]

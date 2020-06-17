@@ -94,7 +94,7 @@ class TransformedDataInterface:
             get_git_hash_from: Locally installed module from which to get git information. Use this arg if
                 transform_func is defined outside of a module tracked by git.
 
-        Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict.
+        Returns: new transform directory name, for adding to contents dict.
         """
         if get_git_hash_from:
             transformer_func_file_repo_path = get_git_repo_of_func(get_git_hash_from)

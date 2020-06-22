@@ -42,7 +42,7 @@ class TransformedData:
 
     @classmethod
     def save(cls, data: Any, transformer_func: Callable, data_directory: 'DataDirectory', file_name: str,
-             enforce_clean_git: bool = True, get_git_hash_from: Any = None) -> Path:
+             enforce_clean_git: bool = True, get_git_hash_from: Any = None, **kwargs) -> Path:
         """
         Alternative public method for saving a TransformedData.
 
@@ -54,10 +54,11 @@ class TransformedData:
         """
         # TODO: convert DataDirectory to path/str
         return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git,
-                                             get_git_hash_from)
+                                             get_git_hash_from, **kwargs)
 
     @classmethod
-    def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None) -> 'TransformedData':
+    def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None, **kwargs
+             ) -> 'TransformedData':
         """
         Alternative public method for loading a TransformedData.
 
@@ -66,7 +67,7 @@ class TransformedData:
             fe_dir = dm['feature_engineering'].latest()
             TransformedData.load(fe_dir)
         """
-        return TransformedDataInterface.load(transformed_data_dir, data_interface_hint)
+        return TransformedDataInterface.load(transformed_data_dir, data_interface_hint, **kwargs)
 
 
 class TransformedDataInterface:
@@ -79,7 +80,7 @@ class TransformedDataInterface:
 
     @classmethod
     def save(cls, data: Any, transformer_func: Callable, parent_path: str, file_name: str, enforce_clean_git=True,
-             get_git_hash_from: Any = None) -> Path:
+             get_git_hash_from: Any = None, **kwargs) -> Path:
         """
         Save a transformed dataset.
 
@@ -117,7 +118,7 @@ class TransformedDataInterface:
 
         data_interface = DataInterfaceManager.select(data_file_type)
         data = transformer_func(data)
-        data_interface.save(data, 'data', new_transform_dir_path)
+        data_interface.save(data, 'data', new_transform_dir_path, **kwargs)
 
         cls.file_component_interfaces['func'].save(transformer_func, 'func', new_transform_dir_path)
 
@@ -128,7 +129,7 @@ class TransformedDataInterface:
         return new_transform_dir_path
 
     @classmethod
-    def load(cls, path: str, data_interface_hint=None, load_function: bool = True) -> 'TransformedData':
+    def load(cls, path: str, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'TransformedData':
         """
         Load a saved data transformer- the data and the function that generated it.
 
@@ -147,7 +148,7 @@ class TransformedDataInterface:
         code_file = file_map['code']
 
         data_interface = DataInterfaceManager.select(data_file, default_file_type=data_interface_hint)
-        data = data_interface.load(data_file)
+        data = data_interface.load(data_file, **kwargs)
         if load_function:
             transformer_func = cls.file_component_interfaces['func'].load(func_file)
         else:

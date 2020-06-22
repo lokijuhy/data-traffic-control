@@ -15,12 +15,12 @@ class DataInterfaceBase:
     file_extension = None
 
     @classmethod
-    def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = None) -> str:
+    def save(cls, data: Any, file_name: str, file_dir_path: str, mode: str = None, **kwargs) -> str:
         file_path = cls.construct_file_path(file_name, file_dir_path)
         if mode is None:
-            cls._interface_specific_save(data, file_path)
+            cls._interface_specific_save(data, file_path, **kwargs)
         else:
-            cls._interface_specific_save(data, file_path, mode)
+            cls._interface_specific_save(data, file_path, mode, **kwargs)
         return file_path
 
     @classmethod
@@ -32,18 +32,18 @@ class DataInterfaceBase:
             return str(Path(file_dir_path, file_name))
 
     @classmethod
-    def _interface_specific_save(cls, data: Any, file_path, mode: str = None) -> None:
+    def _interface_specific_save(cls, data: Any, file_path, mode: str = None, **kwargs) -> None:
         raise NotImplementedError
 
     @classmethod
-    def load(cls, file_path: str) -> Any:
+    def load(cls, file_path: str, **kwargs) -> Any:
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(file_path)
-        return cls._interface_specific_load(str(file_path))
+        return cls._interface_specific_load(str(file_path), **kwargs)
 
     @classmethod
-    def _interface_specific_load(cls, file_path) -> Any:
+    def _interface_specific_load(cls, file_path, **kwargs) -> Any:
         raise NotImplementedError
 
 
@@ -52,13 +52,13 @@ class TextDataInterface(DataInterfaceBase):
     file_extension = 'txt'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path, mode='w'):
-        with open(file_path, mode) as f:
+    def _interface_specific_save(cls, data, file_path, mode='w', **kwargs):
+        with open(file_path, mode, **kwargs) as f:
             f.write(data)
 
     @classmethod
-    def _interface_specific_load(cls, file_path):
-        with open(file_path, 'r') as f:
+    def _interface_specific_load(cls, file_path, **kwargs):
+        with open(file_path, 'r', **kwargs) as f:
             file = f.read()
         return file
 
@@ -68,13 +68,13 @@ class PickleDataInterface(DataInterfaceBase):
     file_extension = 'pkl'
 
     @classmethod
-    def _interface_specific_save(cls, data: Any, file_path, mode='wb+') -> None:
-        with open(file_path, mode) as f:
+    def _interface_specific_save(cls, data: Any, file_path, mode='wb+', **kwargs) -> None:
+        with open(file_path, mode, **kwargs) as f:
             pickle.dump(data, f)
 
     @classmethod
-    def _interface_specific_load(cls, file_path) -> Any:
-        with open(file_path, "rb+") as f:
+    def _interface_specific_load(cls, file_path, **kwargs) -> Any:
+        with open(file_path, "rb+", **kwargs) as f:
             return pickle.load(f)
 
 
@@ -83,13 +83,13 @@ class DillDataInterface(DataInterfaceBase):
     file_extension = 'dill'
 
     @classmethod
-    def _interface_specific_save(cls, data: Any, file_path, mode='wb+') -> None:
-        with open(file_path, mode) as f:
+    def _interface_specific_save(cls, data: Any, file_path, mode='wb+', **kwargs) -> None:
+        with open(file_path, mode, **kwargs) as f:
             dill.dump(data, f)
 
     @classmethod
-    def _interface_specific_load(cls, file_path) -> Any:
-        with open(file_path, "rb+") as f:
+    def _interface_specific_load(cls, file_path, **kwargs) -> Any:
+        with open(file_path, "rb+", **kwargs) as f:
             return dill.load(f)
 
 
@@ -98,12 +98,12 @@ class CSVDataInterface(DataInterfaceBase):
     file_extension = 'csv'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path, mode=None):
-        data.to_csv(file_path, index=False)
+    def _interface_specific_save(cls, data, file_path, mode=None, **kwargs):
+        data.to_csv(file_path, **kwargs)
 
     @classmethod
-    def _interface_specific_load(cls, file_path):
-        return pd.read_csv(file_path)
+    def _interface_specific_load(cls, file_path, **kwargs):
+        return pd.read_csv(file_path, **kwargs)
 
 
 class ExcelDataInterface(DataInterfaceBase):
@@ -111,12 +111,12 @@ class ExcelDataInterface(DataInterfaceBase):
     file_extension = 'xlsx'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path, mode=None):
-        data.to_excel(file_path)
+    def _interface_specific_save(cls, data, file_path, mode=None, **kwargs):
+        data.to_excel(file_path, **kwargs)
 
     @classmethod
-    def _interface_specific_load(cls, file_path):
-        return pd.read_excel(file_path)
+    def _interface_specific_load(cls, file_path, **kwargs):
+        return pd.read_excel(file_path, **kwargs)
 
 
 class PDFDataInterface(DataInterfaceBase):
@@ -124,13 +124,13 @@ class PDFDataInterface(DataInterfaceBase):
     file_extension = 'pdf'
 
     @classmethod
-    def _interface_specific_save(cls, doc, file_path, mode=None):
-        doc.save(file_path, garbage=4, deflate=True, clean=True)
+    def _interface_specific_save(cls, doc, file_path, mode=None, **kwargs):
+        doc.save(file_path, garbage=4, deflate=True, clean=True, **kwargs)
 
     @classmethod
-    def _interface_specific_load(cls, file_path):
+    def _interface_specific_load(cls, file_path, **kwargs):
         import fitz
-        return fitz.open(file_path)
+        return fitz.open(file_path, **kwargs)
 
 
 class YAMLDataInterface(DataInterfaceBase):
@@ -138,14 +138,13 @@ class YAMLDataInterface(DataInterfaceBase):
     file_extension = 'yaml'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path, mode='w'):
-        # TODO: make mode an arg in all saves
-        with open(file_path, mode) as f:
+    def _interface_specific_save(cls, data, file_path, mode='w', **kwargs):
+        with open(file_path, mode, **kwargs) as f:
             yaml.dump(data, f, default_flow_style=False)
 
     @classmethod
-    def _interface_specific_load(cls, file_path):
-        with open(file_path, 'r') as f:
+    def _interface_specific_load(cls, file_path, **kwargs):
+        with open(file_path, 'r', **kwargs) as f:
             data = yaml.safe_load(f)
         return data
 
@@ -156,11 +155,11 @@ class TestingDataInterface(DataInterfaceBase):
     file_extension = 'test'
 
     @classmethod
-    def _interface_specific_save(cls, data, file_path, mode='wb+') -> None:
+    def _interface_specific_save(cls, data, file_path, mode='wb+', **kwargs) -> None:
         return
 
     @classmethod
-    def _interface_specific_load(cls, file_path):
+    def _interface_specific_load(cls, file_path, **kwargs):
         return {'data': 42}
 
 

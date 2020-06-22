@@ -80,23 +80,23 @@ class DataDirectory:
         return self.contents[latest_content]
 
     def save(self, data: Any, file_name: str, transformer_func: Callable = None, enforce_clean_git: bool = True,
-             get_git_hash_from: Any = None) -> None:
+             get_git_hash_from: Any = None, **kwargs) -> None:
 
         if transformer_func is None:
-            self.save_file(data, file_name)
+            self.save_file(data, file_name, **kwargs)
         else:
-            self.transform_and_save(data, transformer_func, file_name, enforce_clean_git, get_git_hash_from)
+            self.transform_and_save(data, transformer_func, file_name, enforce_clean_git, get_git_hash_from, **kwargs)
 
-    def save_file(self, data: Any, file_name: str) -> None:
+    def save_file(self, data: Any, file_name: str, **kwargs) -> None:
         data_interface = DataInterfaceManager.select(file_name)
-        saved_file_path = data_interface.save(data, file_name, self.path)
+        saved_file_path = data_interface.save(data, file_name, self.path, **kwargs)
         self.contents[file_name] = DataFile(saved_file_path)
 
     def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True,
-                           get_git_hash_from: Any = None) -> None:
+                           get_git_hash_from: Any = None, **kwargs) -> None:
         new_transform_dir_path = TransformedDataInterface.save(data, transformer_func, parent_path=self.path,
                                                                file_name=file_name, enforce_clean_git=enforce_clean_git,
-                                                               get_git_hash_from=get_git_hash_from)
+                                                               get_git_hash_from=get_git_hash_from, **kwargs)
         base_name = os.path.basename(new_transform_dir_path)
         self.contents[base_name] = TransformedDataDirectory(new_transform_dir_path)
         return
@@ -220,9 +220,9 @@ class TransformedDataDirectory(DataDirectory):
     def _determine_data_type(self):
         return TransformedDataInterface.get_info(self.path)['data_type']
 
-    def load(self, data_interface_hint=None, load_function: bool = True) -> 'TransformedData':
+    def load(self, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'TransformedData':
         """Load a saved data transformer- the data and the function that generated it."""
-        return TransformedDataInterface.load(self.path, data_interface_hint, load_function)
+        return TransformedDataInterface.load(self.path, data_interface_hint, load_function, **kwargs)
 
     def get_info(self):
         return TransformedDataInterface.get_info(self.path)
@@ -251,10 +251,10 @@ class DataFile(DataDirectory):
         else:
             return 'unknown'
 
-    def load(self, data_interface_hint=None):
+    def load(self, data_interface_hint=None, **kwargs):
         if data_interface_hint is None:
             data_interface = DataInterfaceManager.select(self.data_type)
         else:
             data_interface = DataInterfaceManager.select(data_interface_hint)
         print('Loading {}'.format(self.path))
-        return data_interface.load(self.path)
+        return data_interface.load(self.path, **kwargs)

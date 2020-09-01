@@ -155,7 +155,7 @@ sdt.view_code()
 more_transformed_df = sdt.rerun(new_df)
 ```
 
-`datatc` also automatically tracks metadata about the data transofrmation, including:
+`datatc` also automatically tracks metadata about the data transformation, including:
 * the timestamp of when the transformation was run
 * the git hash of the repo where `transform_func` is located
 

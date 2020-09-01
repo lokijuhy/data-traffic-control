@@ -81,12 +81,6 @@ raw_df = dm['data_extracts']['2020-02-04_Extract_3months']['2020-02-04_Extract_3
 
 Don't worry about what format the file is in- `DataManager` will inutit how to load the file. 
 
-If `DataManager` doesn't recognize the file type, you can give it a type hint of which loader to use. For example, `DataManager` doesn't have a specific interface for reading sql files, but if you tell it to treat it as a txt, it will load it right up:
-
-```python
-raw_df = dm['queries']['batch_query.sql'].load(data_interface_hint='txt')
-```
-
 To help you navigate those long finicky file names, `DataManager` provides a `.select('hint')` method to search for files matching a substring. 
 
 The above example could also be accessed with the following command, which navigates to the latest extract directory and selects the xlsx file:
@@ -108,6 +102,18 @@ raw_df = dm['data_extracts'].latest().select('xlsx').load()
 
 If you ever want to do your own load, and not use the build in `.load()`, you can also use `dm[...]['filename'].path` to get the path to the file for use in a separate loading operation.
 
+If `DataManager` doesn't recognize the file type, you can give it a type hint of which loader to use. For example, `DataManager` doesn't have a specific interface for reading tab separated files, but if you tell it to treat it as a csv, it will load it right up:
+
+```python
+raw_df = dm['queries']['batch_query.tsv'].load(data_interface_hint='csv')
+```
+
+Also, if your file needs special parameters to load it, pecify them in the load, and they will be passed on to the loading function.
+For example, if your csv file is actually pipe separated and has a non-default encoding, you can specify so:
+
+```python
+raw_df = dm['queries']['batch_query.csv'].load(sep='|', encoding='utf-16')
+```
 
 ## Saving and Loading SavedDataTransforms
 `datatc` helps you remember how your datasets were generated. 
@@ -149,6 +155,30 @@ sdt.view_code()
 more_transformed_df = sdt.rerun(new_df)
 ```
 
+`datatc` also automatically tracks metadata about the data transofrmation, including:
+* the timestamp of when the transformation was run
+* the git hash of the repo where `transform_func` is located
+
+This metadata is visible when you `ls` a directory containing transformed data files:
+```python
+dm['feature_sets'].ls()
+feature_sets/
+    four_features.csv   (2020-04-24 17:40, 06ef971)
+    seven_features.csv  (2020-06-17 18:37, c61a1a6)
+    nine_features.csv   (2020-08-19 18:42, 25a173d)
+```
+And you can access the metadata programmatically:
+```python
+dm['feature_sets'].latest().get_info()
+
+{
+    'timestamp': '2020-08-19 18:42',
+    'git_hash': '25a173d',
+    'tag': 'nine_features',
+    'data_type': 'csv'
+}
+```
+
 ### Tracking Git Metadata
 By default, when you save a transformed dataset via a `transform_func`, `datatc` will include the git hash of the repo where `transform_func` is located.
 This workflow assumes that the `transform_func` is written in a file and imported into the active coding environment for use in a `SavedDataTransform`
@@ -156,7 +186,7 @@ If the `transform_func` is not in a file (for example, is written on the fly in 
 the user may specify the module under development to get a git hash from via `get_git_hash_from=module`.
 
 To ensure tracability, `datatc` checks that there are no uncommitted changes in the repo before proceeding with the SavedDataTransform.
-If there are uncommitted changes, `datatc` raises a `RuntimeError`. If you would like to override this check, specify ``enforce_clean_git = False`.
+If there are uncommitted changes, `datatc` raises a `RuntimeError`. If you would like to override this check, specify `enforce_clean_git = False`.
 
 ### Loading SavedDataTransforms in dependency-incomplete environments
 

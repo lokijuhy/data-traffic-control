@@ -10,9 +10,7 @@ Whhrrrr... Voooooosh... That's the sound of your data coming and going exactly w
   - [Shortcuts for loading data files _faster_](#Shortcuts-for-loading-data-files-faster)
   - [Loading irregular data files](#Loading-irregular-data-files)
 - [Saving and Loading `SavedDataTransforms`](#Saving-and-Loading-SavedDataTransforms)
-  - [ Automatic Metadata Tracking of `SavedDataTransforms`](#Automatic-Metadata-Tracking-of-SavedDataTransforms)
-  - [ Note on Tracking Git Metadata](#Note-on-Tracking-Git-Metadata)
-  - [ Loading SavedDataTransforms in dependency-incomplete environments](#Loading-SavedDataTransforms-in-dependency-incomplete-environments)
+  - [`SavedDataTransforms` automatically track metadata](#SavedDataTransforms-automatically-track-metadata)
 - [Working with File Types via `DataInterface`](#Working-with-File-Types-via-DataInterface)
 
 ## Installation
@@ -95,6 +93,7 @@ raw_df = dm['data_extracts']['2020-02-04_Extract_3months']['2020-02-04_Extract_3
 Don't worry about what format the file is in- `DataManager` will inutit how to load the file. 
 
 ### Shortcuts for loading data files _faster_
+#### `select`
 To help you navigate those long finicky file names, `DataManager` provides a `.select('hint')` method to search for files matching a substring. 
 
 The above example could also be accessed with the following command, which navigates to the latest extract directory and selects the xlsx file:
@@ -109,27 +108,30 @@ or even:
 raw_df = dm['data_extracts'].select('2020-01-13').select('xlsx').load()
 ```
 
+#### `latest`
 You can load the latest file or subdirectory within a directory with `.latest()`:
 ```python
 raw_df = dm['data_extracts'].latest().select('xlsx').load()
 ```
 ### Loading irregular data files
-If you ever want to do your own load, and not use the build in `.load()`, you can also use `dm[...]['filename'].path` to get the path to the file for use in a separate loading operation.
-
-If `DataManager` doesn't recognize the file type, you can give it a type hint of which loader to use. For example, `DataManager` doesn't have a specific interface for reading tab separated files, but if you tell it to treat it as a csv, it will load it right up:
-
-```python
-raw_df = dm['queries']['batch_query.tsv'].load(data_interface_hint='csv')
-```
-
-Also, if your file needs special parameters to load it, specify them in `load`, and they will be passed on to the internal loading function.
+#### ... my file needs special arguments to load
+If your file needs special parameters to load it, specify them in `load`, and they will be passed on to the internal loading function.
 For example, if your csv file is actually pipe separated and has a non-default encoding, you can specify so:
 
 ```python
 raw_df = dm['queries']['batch_query.csv'].load(sep='|', encoding='utf-16')
 ```
+#### ... my file type isn't recognized by `DataManager`
+If `DataManager` doesn't recognize the file type, you can give it a type hint of which loader to use. For example, `DataManager` doesn't have a specific interface for reading tab separated files, but if you tell it to treat it as a csv, it will load it right up:
+
+```python
+raw_df = dm['queries']['batch_query.tsv'].load(data_interface_hint='csv')
+```
+#### ... I want to load my file my own way
+If you ever want to do your own load, and not use the build in `.load()`, you can also use `dm[...]['filename'].path` to get the path to the file for use in a separate loading operation.
 
 ## Saving and Loading `SavedDataTransforms`
+### Save
 `datatc` helps you remember how your datasets were generated. 
 Anytime you want `datatc` to help keep track of what transform function was used to create a dataset,
 pass that transform function and the input data to `.save()`, like this: 
@@ -155,6 +157,7 @@ This line of code:
   * saves the result as `my_feature_set.csv`
   * also stamps the code contained in `my_transform` alongside the dataset for easy future reference
 
+### Load
 Afterwards, you can not only load the dataset, but also view and re-use the code that generated that dataset:
 ```python
 sdt = dm['feature_sets'].latest().load()
@@ -169,7 +172,7 @@ sdt.view_code()
 more_transformed_df = sdt.rerun(new_df)
 ```
 
-### Automatic Metadata Tracking of `SavedDataTransforms`
+### `SavedDataTransforms` automatically track metadata
 `datatc` also automatically tracks metadata about the data transformation, including:
 * the timestamp of when the transformation was run
 * the git hash of the repo where `transform_func` is located

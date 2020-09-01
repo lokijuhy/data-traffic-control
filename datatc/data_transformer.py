@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
-from datatc import git_utilities
+from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class TransformedData:
 
     @classmethod
     def save(cls, data: Any, transformer_func: Callable, data_directory: 'DataDirectory', file_name: str,
-             enforce_clean_git=True) -> Path:
+             enforce_clean_git: bool = True, get_git_hash_from: Any = None, **kwargs) -> Path:
         """
         Alternative public method for saving a TransformedData.
 
@@ -53,10 +53,12 @@ class TransformedData:
             TransformedData.save(df, transformer, fe_dir, 'v2.csv')
         """
         # TODO: convert DataDirectory to path/str
-        return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git)
+        return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git,
+                                             get_git_hash_from, **kwargs)
 
     @classmethod
-    def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None) -> 'TransformedData':
+    def load(cls, transformed_data_dir: 'TransformedDataDirectory', data_interface_hint=None, **kwargs
+             ) -> 'TransformedData':
         """
         Alternative public method for loading a TransformedData.
 
@@ -65,7 +67,7 @@ class TransformedData:
             fe_dir = dm['feature_engineering'].latest()
             TransformedData.load(fe_dir)
         """
-        return TransformedDataInterface.load(transformed_data_dir, data_interface_hint)
+        return TransformedDataInterface.load(transformed_data_dir, data_interface_hint, **kwargs)
 
 
 class TransformedDataInterface:
@@ -77,9 +79,10 @@ class TransformedDataInterface:
     }
 
     @classmethod
-    def save(cls, data: Any, transformer_func: Callable, parent_path: str, file_name: str, enforce_clean_git=True)\
-            -> Path:
-        """Save a transformed dataset.
+    def save(cls, data: Any, transformer_func: Callable, parent_path: str, file_name: str, enforce_clean_git=True,
+             get_git_hash_from: Any = None, **kwargs) -> Path:
+        """
+        Save a transformed dataset.
 
         Args:
             data: Input data to transform.
@@ -89,19 +92,33 @@ class TransformedDataInterface:
              data as.
             enforce_clean_git: Whether to only allow the save to proceed if the working state of the git directory is
                 clean.
+            get_git_hash_from: Locally installed module from which to get git information. Use this arg if
+                transform_func is defined outside of a module tracked by git.
 
-        Returns: Tuple[new transform directory name, TransformedDataDirectory object], for adding to contents dict."""
+        Returns: new transform directory name, for adding to contents dict.
+        """
+        if get_git_hash_from:
+            transformer_func_file_repo_path = get_git_repo_of_func(get_git_hash_from)
+        else:
+            transformer_func_file_repo_path = get_git_repo_of_func(transformer_func)
+        transformer_func_in_repo = True if transformer_func_file_repo_path else True
+
         if enforce_clean_git:
-            git_utilities.check_for_uncommitted_git_changes_at_path(git_utilities.get_repo_path())
+            if transformer_func_in_repo:
+                check_for_uncommitted_git_changes_at_path(transformer_func_file_repo_path)
+            else:
+                raise RuntimeError('`transformer_func` is not tracked in a git repo.'
+                                   'Use `enforce_clearn_git=False` to override this restriction.')
 
         tag, data_file_type = os.path.splitext(file_name)
-        transform_dir_name = cls._generate_name_for_transform_dir(tag)
+        git_hash = get_git_hash(transformer_func_file_repo_path) if transformer_func_in_repo else None
+        transform_dir_name = cls._generate_name_for_transform_dir(tag, git_hash)
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
         data_interface = DataInterfaceManager.select(data_file_type)
         data = transformer_func(data)
-        data_interface.save(data, 'data', new_transform_dir_path)
+        data_interface.save(data, 'data', new_transform_dir_path, **kwargs)
 
         cls.file_component_interfaces['func'].save(transformer_func, 'func', new_transform_dir_path)
 
@@ -112,7 +129,7 @@ class TransformedDataInterface:
         return new_transform_dir_path
 
     @classmethod
-    def load(cls, path: str, data_interface_hint=None, load_function: bool = True) -> 'TransformedData':
+    def load(cls, path: str, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'TransformedData':
         """
         Load a saved data transformer- the data and the function that generated it.
 
@@ -131,7 +148,7 @@ class TransformedDataInterface:
         code_file = file_map['code']
 
         data_interface = DataInterfaceManager.select(data_file, default_file_type=data_interface_hint)
-        data = data_interface.load(data_file)
+        data = data_interface.load(data_file, **kwargs)
         if load_function:
             transformer_func = cls.file_component_interfaces['func'].load(func_file)
         else:
@@ -173,9 +190,7 @@ class TransformedDataInterface:
             return options[0]
 
     @classmethod
-    def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
-        repo_path = git_utilities.get_repo_path()
-        git_hash = git_utilities.get_git_hash(repo_path)
+    def _generate_name_for_transform_dir(cls, tag: str = None, git_hash: str = None) -> str:
         timestamp = cls._generate_timestamp()
         delimiter_char = '__'
         file_name_components = ['transformed_data_dir', timestamp, git_hash]

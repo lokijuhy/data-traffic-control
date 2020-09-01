@@ -108,7 +108,7 @@ If `DataManager` doesn't recognize the file type, you can give it a type hint of
 raw_df = dm['queries']['batch_query.tsv'].load(data_interface_hint='csv')
 ```
 
-Also, if your file needs special parameters to load it, pecify them in the load, and they will be passed on to the loading function.
+Also, if your file needs special parameters to load it, specify them in `load`, and they will be passed on to the internal loading function.
 For example, if your csv file is actually pipe separated and has a non-default encoding, you can specify so:
 
 ```python

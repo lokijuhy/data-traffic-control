@@ -2,18 +2,18 @@
 Whhrrrr... Voooooosh... That's the sound of your data coming and going exactly where it belongs
 
 ## Contents
-- [Installation](##Installation)
-- [Import](##Import)
-- [Register a project with `DataManager`](##Register-a-project-with-DataManager)
-- [Explore the data directory](##Explore-the-data-directory)
-- [Loading data files](##Loading-data-files)
-  - [Shortcuts for loading data files _faster_](###Shortcuts-for-loading-data-files-faster)
-  - [Loading irregular data files](###Loading-irregular-data-files)
-- [Saving and Loading `SavedDataTransforms`](##Saving-and-Loading-SavedDataTransforms)
-  - [ Automatic Metadata Tracking of `SavedDataTransforms`](###Automatic-Metadata-Tracking-of-SavedDataTransforms)
-  - [ Note on Tracking Git Metadata](###Note-on-Tracking-Git-Metadata)
-  - [ Loading SavedDataTransforms in dependency-incomplete environments](###Loading-SavedDataTransforms-in-dependency-incomplete-environments)
-- [Working with File Types via `DataInterface`](##Working-with-File-Types-via-DataInterface)
+- [Installation](#Installation)
+- [Import](#Import)
+- [Register a project with `DataManager`](#Register-a-project-with-DataManager)
+- [Explore the data directory](#Explore-the-data-directory)
+- [Loading data files](#Loading-data-files)
+  - [Shortcuts for loading data files _faster_](#Shortcuts-for-loading-data-files-faster)
+  - [Loading irregular data files](#Loading-irregular-data-files)
+- [Saving and Loading `SavedDataTransforms`](#Saving-and-Loading-SavedDataTransforms)
+  - [ Automatic Metadata Tracking of `SavedDataTransforms`](#Automatic-Metadata-Tracking-of-SavedDataTransforms)
+  - [ Note on Tracking Git Metadata](#Note-on-Tracking-Git-Metadata)
+  - [ Loading SavedDataTransforms in dependency-incomplete environments](#Loading-SavedDataTransforms-in-dependency-incomplete-environments)
+- [Working with File Types via `DataInterface`](#Working-with-File-Types-via-DataInterface)
 
 ## Installation
 

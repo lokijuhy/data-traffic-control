@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='datatc',
-      version='0.0.2',
+      version='0.0.3',
       description='',
       url='https://github.com/uzh-dqbm-cmi/data-traffic-control',
       packages=['datatc', ],

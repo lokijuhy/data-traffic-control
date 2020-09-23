@@ -119,6 +119,19 @@ class ExcelDataInterface(DataInterfaceBase):
         return pd.read_excel(file_path, **kwargs)
 
 
+class ParquetDataInterface(DataInterfaceBase):
+
+    file_extension = 'parquet'
+
+    @classmethod
+    def _interface_specific_save(cls, data, file_path, mode=None, **kwargs):
+        data.to_parquet(file_path, **kwargs)
+
+    @classmethod
+    def _interface_specific_load(cls, file_path, **kwargs):
+        return pd.read_parquet(file_path, **kwargs)
+
+
 class PDFDataInterface(DataInterfaceBase):
 
     file_extension = 'pdf'
@@ -169,6 +182,7 @@ class DataInterfaceManager:
         'pkl': PickleDataInterface,
         'dill': DillDataInterface,
         'csv': CSVDataInterface,
+        'parquet': ParquetDataInterface,
         'xlsx': ExcelDataInterface,
         'txt': TextDataInterface,
         'sql': TextDataInterface,

@@ -1,5 +1,6 @@
 import unittest
 from datatc.data_directory import DataDirectory, DataFile
+from datatc.data_interface import TestDataInterfaceManager
 
 
 class TestDataDirectory(unittest.TestCase):
@@ -130,7 +131,8 @@ class TestDataDirectory(unittest.TestCase):
         expected_file_path = '$HOME/{}'.format(file_name)
         expected_directory_contents_after_save = {file_name: DataFile(expected_file_path)}
 
-        data_directory = DataDirectory(path='$HOME', contents=initial_directory_contents)
+        data_directory = DataDirectory(path='$HOME', contents=initial_directory_contents,
+                                       data_interface_manager=TestDataInterfaceManager)
         data_directory.save_file(42, file_name)
 
         # check that the contents keys (the file names) are the same

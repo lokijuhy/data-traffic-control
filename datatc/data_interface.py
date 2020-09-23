@@ -3,7 +3,7 @@ from pathlib import Path
 import pickle
 import dill
 import os
-from typing import Any
+from typing import Type, Any
 import yaml
 
 
@@ -119,6 +119,19 @@ class ExcelDataInterface(DataInterfaceBase):
         return pd.read_excel(file_path, **kwargs)
 
 
+class ParquetDataInterface(DataInterfaceBase):
+
+    file_extension = 'parquet'
+
+    @classmethod
+    def _interface_specific_save(cls, data, file_path, mode=None, **kwargs):
+        data.to_parquet(file_path, **kwargs)
+
+    @classmethod
+    def _interface_specific_load(cls, file_path, **kwargs):
+        return pd.read_parquet(file_path, **kwargs)
+
+
 class PDFDataInterface(DataInterfaceBase):
 
     file_extension = 'pdf'
@@ -163,40 +176,30 @@ class TestingDataInterface(DataInterfaceBase):
         return {'data': 42}
 
 
-class DataInterfaceManager:
+class DataInterfaceManagerBase:
 
-    registered_interfaces = {
-        'pkl': PickleDataInterface,
-        'dill': DillDataInterface,
-        'csv': CSVDataInterface,
-        'xlsx': ExcelDataInterface,
-        'txt': TextDataInterface,
-        'sql': TextDataInterface,
-        'pdf': PDFDataInterface,
-        'yaml': YAMLDataInterface,
+    def __init__(self):
+        self.registered_interfaces = {}
 
-        # for unit testing purposes only
-        'test': TestingDataInterface,
-    }
+    def register_data_interface(self, data_interface: Type[DataInterfaceBase]) -> None:
+        self.registered_interfaces[data_interface.file_extension] = data_interface
 
-    @classmethod
-    def instantiate_data_interface(cls, file_type: str) -> DataInterfaceBase:
-        if file_type in cls.registered_interfaces:
-            return cls.registered_interfaces[file_type]()
+    def instantiate_data_interface(self, file_type: str) -> DataInterfaceBase:
+        if file_type in self.registered_interfaces:
+            return self.registered_interfaces[file_type]()
         else:
             raise ValueError("File type {} not recognized. Supported file types include {}".format(
-                file_type, list(cls.registered_interfaces.keys())))
+                file_type, list(self.registered_interfaces.keys())))
 
-    @classmethod
-    def parse_file_hint(cls, file_hint: str) -> str:
+    @staticmethod
+    def parse_file_hint(file_hint: str) -> str:
         if '.' in file_hint:
             file_name, file_extension = file_hint.split('.')
             return file_extension
         else:
             return file_hint
 
-    @classmethod
-    def select(cls, file_hint: str, default_file_type=None) -> DataInterfaceBase:
+    def select(self, file_hint: str, default_file_type=None) -> DataInterfaceBase:
         """
         Select the appropriate data interface based on the file_hint.
 
@@ -205,11 +208,31 @@ class DataInterfaceManager:
             default_file_type: default file type to use, if the file_hint doesn't specify.
         Returns: A DataInterface.
         """
-        file_hint = cls.parse_file_hint(file_hint)
-        if file_hint in cls.registered_interfaces:
-            return cls.instantiate_data_interface(file_hint)
+        file_hint = self.parse_file_hint(file_hint)
+        if file_hint in self.registered_interfaces:
+            return self.instantiate_data_interface(file_hint)
         elif default_file_type is not None:
-            return cls.instantiate_data_interface(default_file_type)
+            return self.instantiate_data_interface(default_file_type)
         else:
             raise ValueError("File hint {} not recognized. Supported file types include {}".format(
-                file_hint, list(cls.registered_interfaces.keys())))
+                file_hint, list(self.registered_interfaces.keys())))
+
+
+all_live_interfaces = [
+    PickleDataInterface,
+    DillDataInterface,
+    CSVDataInterface,
+    ParquetDataInterface,
+    ExcelDataInterface,
+    TextDataInterface,
+    TextDataInterface,
+    PDFDataInterface,
+    YAMLDataInterface,
+]
+
+DataInterfaceManager = DataInterfaceManagerBase()
+for interface in all_live_interfaces:
+    DataInterfaceManager.register_data_interface(interface)
+
+TestDataInterfaceManager = DataInterfaceManagerBase()
+TestDataInterfaceManager.register_data_interface(TestingDataInterface)

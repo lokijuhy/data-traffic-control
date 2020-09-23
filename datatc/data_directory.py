@@ -13,7 +13,7 @@ DIRS_TO_IGNORE = ['__pycache__']
 class DataDirectory:
     """Manages interacting with data at a specific data path."""
 
-    def __init__(self, path, contents: Dict[str, 'DataDirectory'] = None):
+    def __init__(self, path, contents: Dict[str, 'DataDirectory'] = None, data_interface_manager=DataInterfaceManager):
         """
         Initialize a DataDirectory at a path. The contents of that DataDirectory are recursively characterized and the
         DataDirectory's data_type set. For testing purposes, the contents can also be set directly.
@@ -21,6 +21,7 @@ class DataDirectory:
         Args:
             path: The file path to which the DataDirectory corresponds.
             contents: The files and subdirectories contained in the directory.
+            data_interface_manager: DataInterfaceManager object to use to interface with files.
         """
         # TODO: check path
         self.path = path
@@ -31,6 +32,7 @@ class DataDirectory:
             self.contents = contents
         # determine_data_type has to be done _after_ characterize dir because it inspects the children
         self.data_type = self._determine_data_type()
+        self.data_interface_manager = data_interface_manager
 
     def __getitem__(self, key):
         return self.contents[key]
@@ -88,7 +90,7 @@ class DataDirectory:
             self.transform_and_save(data, transformer_func, file_name, enforce_clean_git, get_git_hash_from, **kwargs)
 
     def save_file(self, data: Any, file_name: str, **kwargs) -> None:
-        data_interface = DataInterfaceManager.select(file_name)
+        data_interface = self.data_interface_manager.select(file_name)
         saved_file_path = data_interface.save(data, file_name, self.path, **kwargs)
         self.contents[file_name] = DataFile(saved_file_path)
 
@@ -253,8 +255,8 @@ class DataFile(DataDirectory):
 
     def load(self, data_interface_hint=None, **kwargs):
         if data_interface_hint is None:
-            data_interface = DataInterfaceManager.select(self.data_type)
+            data_interface = self.data_interface_manager.select(self.data_type)
         else:
-            data_interface = DataInterfaceManager.select(data_interface_hint)
+            data_interface = self.data_interface_manager.select(data_interface_hint)
         print('Loading {}'.format(self.path))
         return data_interface.load(self.path, **kwargs)

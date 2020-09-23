@@ -179,7 +179,7 @@ class TestingDataInterface(DataInterfaceBase):
 class DataInterfaceManagerBase:
 
     def __init__(self):
-        self.registered_interfaces = None
+        self.registered_interfaces = {}
 
     def register_data_interface(self, data_interface: Type[DataInterfaceBase]) -> None:
         self.registered_interfaces[data_interface.file_extension] = data_interface

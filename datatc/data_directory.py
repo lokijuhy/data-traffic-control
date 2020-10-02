@@ -1,7 +1,7 @@
 import glob
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Union
 
 from datatc.data_interface import DataInterfaceManager
 from datatc.data_transformer import TransformedData, TransformedDataInterface
@@ -11,7 +11,7 @@ DIRS_TO_IGNORE = ['__pycache__']
 
 
 class DataDirectory:
-    """Manages interacting with data at a specific data path."""
+    """Manages saving, loading, and viewing data files within a specific data path."""
 
     def __init__(self, path, contents: Dict[str, 'DataDirectory'] = None, data_interface_manager=DataInterfaceManager):
         """
@@ -50,10 +50,17 @@ class DataDirectory:
         else:
             return unique_dir_data_types[0]
 
-    def select(self, hint: str) -> 'DataDirectory':
+    def select(self, hint: str) -> Union['DataDirectory', 'DataFile']:
         """Return the DataDirectory from self.contents that matches the hint.
         If more than one file matches the hint, then select the one that file whose type matches the hint exactly.
         Otherwise raise an error and display all matches.
+
+        Args:
+            hint: string to use to search for a file within the directory.
+
+        Raises:
+            FileNotFoundError: if no file can be found in the data directory that matches the hint.
+            ValueError: if more than one file is found in the data directory that matches the hint.
         """
         matches = [self.contents[d] for d in self.contents if hint in self.contents[d].name]
         if len(matches) == 1:
@@ -72,7 +79,7 @@ class DataDirectory:
                 match_names = [m.name for m in exact_matches]
                 raise ValueError("More than one match found: [{}]".format(', '.join(match_names)))
 
-    def latest(self) -> 'DataDirectory':
+    def latest(self) -> Union['DataDirectory', 'DataFile']:
         """Return the latest data file or directory, as determined alphabetically."""
         if len(self.contents) == 0:
             return None
@@ -83,6 +90,21 @@ class DataDirectory:
 
     def save(self, data: Any, file_name: str, transformer_func: Callable = None, enforce_clean_git: bool = True,
              get_git_hash_from: Any = None, **kwargs) -> None:
+        """
+        Save a data object within the data directory.
+
+        Args:
+            data: data object to save.
+            file_name: file name for the saved object, including file extension. The file extension is used to determine
+                the file type and method for saving the data.
+            transformer_func: Transformation function to run on the data object before saving. If provided,
+                the result will be saved as a `TransformedDataDirectory`.
+            enforce_clean_git: Whether to require a clean git state before proceeding with the save.
+            get_git_hash_from: Package to get the git hash metadata from. Useful if the `transformer_func` is not
+                defined within a git repo.
+            **kwargs: Remaining args are passed to the data interface save function.
+
+        """
 
         if transformer_func is None:
             self.save_file(data, file_name, **kwargs)
@@ -142,8 +164,6 @@ class DataDirectory:
 
         Args:
             full: Whether to print all files.
-
-        Returns: prints!
 
         """
         contents_ls_tree = self._build_ls_tree(full=full)
@@ -209,12 +229,7 @@ class DataDirectory:
 
 
 class TransformedDataDirectory(DataDirectory):
-    """Manages interacting with the file expression of TransformedData, which is:
-    transformed_data_<date>_<git_hash>_<tag>/
-        data.xxx
-        func.dill
-        code.txt
-    """
+    """Subclass of `DataDirectory` that manages interacting with the file expression of TransformedData."""
 
     def __init__(self, path, contents=None):
         super().__init__(path, contents)
@@ -222,11 +237,20 @@ class TransformedDataDirectory(DataDirectory):
     def _determine_data_type(self):
         return TransformedDataInterface.get_info(self.path)['data_type']
 
-    def load(self, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'TransformedData':
-        """Load a saved data transformer- the data and the function that generated it."""
+    def load(self, data_interface_hint: str = None, load_function: bool = True, **kwargs) -> 'TransformedData':
+        """
+        Load a saved data transformer- the data and the function that generated it.
+
+        Args:
+            data_interface_hint: file extension indicating the data interface to use to load the file.
+            load_function: Whether to load the transformation function of the TransformedData object. Specify False if
+                the current environment does not support the dependencies of the transformation function.
+            **kwargs: Remaining args are passed to the data interface save function.
+        """
         return TransformedDataInterface.load(self.path, data_interface_hint, load_function, **kwargs)
 
-    def get_info(self):
+    def get_info(self) -> Dict[str, str]:
+        """Get metadata about the `TransformedData` object."""
         return TransformedDataInterface.get_info(self.path)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
@@ -243,7 +267,7 @@ class DataFile(DataDirectory):
     def __getitem__(self, key):
         raise NotADirectoryError('This is a file!')
 
-    def is_file(self):
+    def is_file(self) -> bool:
         return True
 
     def _determine_data_type(self):
@@ -253,7 +277,15 @@ class DataFile(DataDirectory):
         else:
             return 'unknown'
 
-    def load(self, data_interface_hint=None, **kwargs):
+    def load(self, data_interface_hint=None, **kwargs) -> Any:
+        """
+        Load a data file.
+
+        Args:
+            data_interface_hint: file extension indicating the data interface to use to load the file.
+            **kwargs: Remaining args are passed to the data interface save function.
+
+        """
         if data_interface_hint is None:
             data_interface = self.data_interface_manager.select(self.data_type)
         else:

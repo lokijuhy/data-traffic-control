@@ -3,7 +3,7 @@ from setuptools import setup
 URL = "https://github.com/uzh-dqbm-cmi/data-traffic-control"
 PROJECT_URLS = {
     "Bug Tracker": "https://github.com/uzh-dqbm-cmi/data-traffic-control/issues",
-    "Documentation": "https://github.com/uzh-dqbm-cmi/data-traffic-control",
+    "Documentation": "https://data-traffic-control.readthedocs.io/en/latest/",
     "Source Code": "https://github.com/uzh-dqbm-cmi/data-traffic-control",
 }
 

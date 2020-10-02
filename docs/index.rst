@@ -6,19 +6,13 @@
 Welcome to Data Traffic Control's documentation!
 ================================================
 
-.. automodule:: datatc.data_manager
-    :members:
-
-.. automodule:: datatc.data_directory
-    :members:
-
-.. automodule:: datatc.data_transformer
-    :members:
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   getting_started
+   api_reference
 
 
 Indices and tables

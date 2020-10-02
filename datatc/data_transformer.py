@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class TransformedData:
     """A wrapper around a dataset that also contains the code that generated the data.
-     TransformedData can re-run it's transformer function on a new dataset."""
+     `TransformedData` can re-run it's transformer function on a new dataset."""
 
     def __init__(self, data: Any, transformer_func: Callable, code: str, info: Dict = None):
         self.data_set = data
@@ -24,20 +24,32 @@ class TransformedData:
         self.info = info
 
     @property
-    def data(self):
+    def data(self) -> Any:
+        """The data"""
         return self.data_set
 
     @property
-    def func(self):
+    def func(self) -> Callable:
+        """The transformation function that generated the data."""
         return self.transformer_func
 
-    def rerun(self, *args, **kwargs):
+    def rerun(self, *args, **kwargs) -> Any:
+        """
+        Rerun the same transformation function that generated this `TransformedData` on a new data object.
+        Args:
+            *args:
+            **kwargs:
+
+        Returns:
+
+        """
         if self.transformer_func is not None:
             return self.transformer_func(*args, **kwargs)
         else:
             raise ValueError('TransformedData Function was not loaded')
 
     def view_code(self):
+        """Print the code of the transformation function that generated the data."""
         print(self.code)
 
     @classmethod
@@ -47,10 +59,9 @@ class TransformedData:
         Alternative public method for saving a TransformedData.
 
         Example Usage:
-            dm = DataManager('path')
-            fe_dir = dm['feature_engineering']
-
-            TransformedData.save(df, transformer, fe_dir, 'v2.csv')
+            >>> dm = DataManager('path')
+            >>> fe_dir = dm['feature_engineering']
+            >>> TransformedData.save(df, transformer, fe_dir, 'v2.csv')
         """
         # TODO: convert DataDirectory to path/str
         return TransformedDataInterface.save(data, transformer_func, data_directory, file_name, enforce_clean_git,
@@ -63,14 +74,15 @@ class TransformedData:
         Alternative public method for loading a TransformedData.
 
         Example Usage:
-            dm = DataManager('path')
-            fe_dir = dm['feature_engineering'].latest()
-            TransformedData.load(fe_dir)
+            >>> dm = DataManager('path')
+            >>> fe_dir = dm['feature_engineering'].latest()
+            >>> TransformedData.load(fe_dir)
         """
         return TransformedDataInterface.load(transformed_data_dir, data_interface_hint, **kwargs)
 
 
 class TransformedDataInterface:
+    """DataInterface for saving and loading `TransformedData` objects."""
 
     file_component_interfaces = {
         'data': None,

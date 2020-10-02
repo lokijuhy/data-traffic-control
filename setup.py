@@ -1,10 +1,32 @@
 from setuptools import setup
 
+URL = "https://github.com/uzh-dqbm-cmi/data-traffic-control"
+PROJECT_URLS = {
+    "Bug Tracker": "https://github.com/uzh-dqbm-cmi/data-traffic-control/issues",
+    "Documentation": "https://data-traffic-control.readthedocs.io/en/latest/",
+    "Source Code": "https://github.com/uzh-dqbm-cmi/data-traffic-control",
+}
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(name='datatc',
-      version='0.0.3',
-      description='',
-      url='https://github.com/uzh-dqbm-cmi/data-traffic-control',
+      version='0.0.4',
+      author="Laura Kinkead",
+      description='Automate every-day interactions with your data.',
+      long_description=long_description,
+      long_description_content_type="text/markdown",
+      url=URL,
+      project_urls=PROJECT_URLS,
       packages=['datatc', ],
+      classifiers=[
+            "Programming Language :: Python :: 3",
+            "License :: OSI Approved :: MIT License",
+            "Operating System :: OS Independent",
+            "Development Status :: 2 - Pre-Alpha",
+            "Intended Audience :: Science/Research",
+            "Topic :: Scientific/Engineering",
+      ],
       python_requires='>3.5.0',
       install_requires=[
             'dill',

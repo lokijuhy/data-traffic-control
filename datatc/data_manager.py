@@ -9,25 +9,26 @@ CONFIG_FILE_NAME = '.data_map.yaml'
 
 class DataManager:
     """
-    Manage the storage, retrieval, versioning, and provenance of data in various formats.
+    Keep track of project data directories.
 
     """
 
-    def __init__(self, path_hint):
+    def __init__(self, path_hint: str):
         """
-        Initialize a DataManager pointing at a project data_path. Can refer to ~/.data_manager.yaml, which has format:
-            project:
-                path: ~/path/to/project
-        Args:
-            path_hint: a path that exists, or a key in the config for a path
+        Initialize a DataManager pointing at a project's data_path.
 
-       Note:
-           On windows OS, the backslash in the string should be escaped!!
+        Args:
+            path_hint: the name of a project that has been previously registered to `DataManager`, or a path to a data
+                directory.
+
         """
         self.data_path = self._identify_data_path(path_hint)
         self.data_directory = DataDirectory(self.data_path.__str__())
 
     def reload(self):
+        """Refresh the data directory contents that `DataManager` is aware of.
+        Useful if you have created a new file on the file system without using `DataManager`, and now need `DataManager`
+        to know about it. """
         self.data_directory = DataDirectory(self.data_path)
 
     def __getitem__(self, key):
@@ -42,8 +43,6 @@ class DataManager:
         Args:
             project_hint: Name for project
             project_path: Path to project's data directory
-
-        Returns: None.
 
         Raises: ValueError if project_hint already exists in file
 
@@ -66,12 +65,7 @@ class DataManager:
 
     @classmethod
     def list_projects(cls) -> None:
-        """
-        List the projects registered to the config.
-
-        Returns: None. Just prints.
-
-        """
+        """List the projects known to `DataManager`."""
         config = cls._load_config()
         if len(config) == 0:
             print("No projects registered!")
@@ -154,7 +148,15 @@ class DataManager:
         with open(config_file_path.__str__(), 'a') as f:
             yaml.dump(config_entry_data, f, default_flow_style=False)
 
-    def ls(self, full: bool = False):
+    def ls(self, full: bool = False) -> None:
+        """
+        List the contents of the data directory.
+
+        Args:
+            full: If True, prints the full data directory contents. If false, prints only a summary of the file types
+             contained in each directory (prints all subdirectories).
+
+        """
         self.data_directory.ls(full=full)
 
     def _identify_data_path(self, path_hint):

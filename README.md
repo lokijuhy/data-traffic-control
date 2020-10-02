@@ -1,5 +1,7 @@
 # data-traffic-control
 [![PyPI Latest Release](https://img.shields.io/pypi/v/datatc.svg)](https://pypi.org/project/datatc/)
+[![Travis Build Status](https://travis-ci.org/uzh-dqbm-cmi/data-traffic-control.svg?branch=master)](https://travis-ci.org/github/uzh-dqbm-cmi/data-traffic-control)
+[![Documentation Status](https://readthedocs.org/projects/data-traffic-control/badge/?version=latest)](https://data-traffic-control.readthedocs.io/en/latest/?badge=latest)
 
 Whhrrrr... Voooooosh... That's the sound of your data coming and going exactly where it belongs
 

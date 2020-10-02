@@ -15,7 +15,7 @@ Whhrrrr... Voooooosh... That's the sound of your data coming and going exactly w
 
 ## Installation
 
-Clone this repo, `cd` into the newly created `data-traffic-control` directory, and run `pip install -e .` to install the `datatc` package.
+`pip install datatc`
 
 ## Import
 There's only one import you'll need from datatc:

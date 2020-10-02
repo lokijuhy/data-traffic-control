@@ -37,6 +37,7 @@ setup(name='datatc',
             'xlrd',
       ],
       extras_require={
-            'pdf': ['pymupdf']
+            'pdf': ['pymupdf'],
+            'docs': ['sphinx_autodoc_typehints'],
       },
       zip_safe=False)

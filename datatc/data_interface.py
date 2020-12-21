@@ -125,11 +125,20 @@ class ParquetDataInterface(DataInterfaceBase):
 
     @classmethod
     def _interface_specific_save(cls, data, file_path, mode=None, **kwargs):
-        data.to_parquet(file_path, **kwargs)
+        try:
+            data.to_parquet(file_path, **kwargs)
+        except ImportError as import_error:
+            raise ImportError('Parquet engine must be installed separately. See ImportError from pandas:'
+                              '\n{}'.format(import_error))
 
     @classmethod
     def _interface_specific_load(cls, file_path, **kwargs):
-        return pd.read_parquet(file_path, **kwargs)
+        try:
+            data = pd.read_parquet(file_path, **kwargs)
+        except ImportError as import_error:
+            raise ImportError('Parquet engine must be installed separately. See ImportError from pandas:'
+                              '\n{}'.format(import_error))
+        return data
 
 
 class PDFDataInterface(DataInterfaceBase):

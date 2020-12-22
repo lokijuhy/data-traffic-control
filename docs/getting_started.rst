@@ -130,7 +130,7 @@ For example:
 ----
 
 
-Saving and Loading `TransformedData`
+Saving and Loading `SelfAwareData`
 --------------------------------------------
 Save
 '''''''
@@ -155,7 +155,7 @@ Anytime you want `datatc` to help keep track of what transform function was used
     dm['feature_sets'].save(input_df, 'my_feature_set.csv', my_transform)
 
 
-This uses `datatc`'s `TransformedData` functionality to save a dataset *and* the code that generated it.
+This uses `datatc`'s `SelfAwareData` functionality to save a dataset *and* the code that generated it.
 
 This line of code:
   * consumes `input_df`
@@ -164,7 +164,7 @@ This line of code:
   * also stamps the code contained in `my_transform` alongside the dataset for easy future reference
 
 
-`TransformedData` objects automatically track their own metadata
+`SelfAwareData` objects automatically track their own metadata
 .................................................................
 
 `datatc` also automatically tracks metadata about the data transformation, including:
@@ -193,22 +193,22 @@ And you can access the metadata programmatically:
 Note on Tracking Git Metadata
 ................................
 By default, when you save a transformed dataset via a ``transform_func``, `datatc` will include the git hash of the repo where ``transform_func`` is located.
-This workflow assumes that the ``transform_func``` is written in a file and imported into the active coding environment for use in creating a ``TransformedData`` object.
+This workflow assumes that the ``transform_func``` is written in a file and imported into the active coding environment for use in creating a ``SelfAwareData`` object.
 If the ``transform_func`` is not in a file (for example, is written on the fly in a notebook or in an interactive session),
 the user may specify the module under development to get a git hash from via ``get_git_hash_from=module``.
 
-To ensure traceability, `datatc` checks that there are no uncommitted changes in the repo before proceeding with creating the `TransformedData`.
+To ensure traceability, `datatc` checks that there are no uncommitted changes in the repo before proceeding with creating the `SelfAwareData`.
 If there are uncommitted changes, `datatc`` raises a ``RuntimeError``. If you would like to override this check, specify ``enforce_clean_git = False``.
 
 
 Load
 '''''''
 
-Loading `TransformedData` works the same as loading any other data file with DataManager.
+Loading `SelfAwareData` works the same as loading any other data file with DataManager.
 
 >>> td = dm['feature_sets']['my_feature_set.csv'].load()
 
-This load returns you a `TransformedData` object. This object contains not only the data you transformed and saved, but also the transformation function itself.
+This load returns you a `SelfAwareData` object. This object contains not only the data you transformed and saved, but also the transformation function itself.
 
 To access the data:
 
@@ -223,13 +223,13 @@ To rerun the same transformation function on a new data object:
 >>> td.rerun(new_df)
 
 
-Loading `TransformedData` objects in dependency-incomplete environments
+Loading `SelfAwareData` objects in dependency-incomplete environments
 .............................................................................
 
-If the `TransformedData` object is moved to a different environment where the dependencies for the code transform are not met,
+If the `SelfAwareData` object is moved to a different environment where the dependencies for the code transform are not met,
 use
 
->>> td = TransformedDataDirectory.load(load_function=False)
+>>> td = SelfAwareDataDirectory.load(load_function=False)
 
 to avoid a ``ModuleNotFoundError``.
 

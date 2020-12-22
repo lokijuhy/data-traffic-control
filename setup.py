@@ -11,7 +11,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='datatc',
-      version='0.0.4',
+      version='0.0.5',
       author="Laura Kinkead",
       description='Automate every-day interactions with your data.',
       long_description=long_description,

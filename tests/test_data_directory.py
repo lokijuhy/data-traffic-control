@@ -133,7 +133,7 @@ class TestDataDirectory(unittest.TestCase):
 
         data_directory = DataDirectory(path='$HOME', contents=initial_directory_contents,
                                        data_interface_manager=TestDataInterfaceManager)
-        data_directory.save_file(42, file_name)
+        data_directory._save_file(42, file_name)
 
         # check that the contents keys (the file names) are the same
         self.assertEqual(data_directory.contents.keys(), expected_directory_contents_after_save.keys())

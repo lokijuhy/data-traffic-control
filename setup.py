@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 URL = "https://github.com/uzh-dqbm-cmi/data-traffic-control"
 PROJECT_URLS = {
@@ -18,7 +18,7 @@ setup(name='datatc',
       long_description_content_type="text/markdown",
       url=URL,
       project_urls=PROJECT_URLS,
-      packages=['datatc', ],
+      packages=find_packages(),
       classifiers=[
             "Programming Language :: Python :: 3",
             "License :: OSI Approved :: MIT License",

@@ -139,9 +139,10 @@ class DataDirectory:
                 continue
             if os.path.isdir(p):
                 if 'sad_dir' in p or 'transformed_data_dir' in p:
-                    contents[name] = SelfAwareDataDirectory(p)
+                    data_directory = SelfAwareDataDirectory(p)
                 else:
-                    contents[name] = DataDirectory(p)
+                    data_directory = DataDirectory(p)
+                contents[data_directory.name] = data_directory
             elif os.path.isfile(p):
                 contents[name] = DataFile(p)
             else:

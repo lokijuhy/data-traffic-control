@@ -1,6 +1,6 @@
 # data-traffic-control
 [![PyPI Latest Release](https://img.shields.io/pypi/v/datatc.svg)](https://pypi.org/project/datatc/)
-[![Travis Build Status](https://travis-ci.org/uzh-dqbm-cmi/data-traffic-control.svg?branch=master)](https://travis-ci.org/github/uzh-dqbm-cmi/data-traffic-control)
+[![GitHub Actions Build Status](https://github.com/uzh-dqbm-cmi/data-traffic-control/workflows/Python%20package/badge.svg?branch=master)](https://github.com/uzh-dqbm-cmi/data-traffic-control/actions?query=workflow%3A%22Python+package%22)
 [![Documentation Status](https://readthedocs.org/projects/data-traffic-control/badge/?version=latest)](https://data-traffic-control.readthedocs.io/en/latest/?badge=latest)
 
 Whhrrrr... Voooooosh... That's the sound of your data coming and going exactly where it belongs

@@ -224,6 +224,9 @@ class SelfAwareDataDirectory(DataDirectory):
     def __init__(self, path, contents=None):
         super().__init__(path, contents)
 
+        # Overwrite the name (normally os.path.basename) with effective file name
+        self.name = self._get_printable_filename()
+
     def _determine_data_type(self):
         return SelfAwareDataInterface.get_info(self.path)['data_type']
 
@@ -244,9 +247,17 @@ class SelfAwareDataDirectory(DataDirectory):
         return SelfAwareDataInterface.get_info(self.path)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
+        printable_filename = self._get_printable_filename()
         info = SelfAwareDataInterface.get_info(self.path)
-        ls_description = '{}.{}  ({}, {})'.format(info['tag'], info['data_type'], info['timestamp'], info['git_hash'])
+        ls_description = '{}  ({}, {})'.format(printable_filename, info['timestamp'], info['git_hash'])
         return {ls_description: []}
+
+    def _get_printable_filename(self) -> str:
+        """Build the filename that should be printed to describe the TransformedDataDirectory.
+         The filename is created based on the TransformedDataDirectory tag and file type."""
+        info = SelfAwareDataInterface.get_info(self.path)
+        effective_filename = '{}.{}'.format(info['tag'], info['data_type'])
+        return effective_filename
 
 
 class DataFile(DataDirectory):

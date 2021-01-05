@@ -15,7 +15,7 @@ DataDirectory
 .. autoclass:: datatc.data_directory.DataDirectory
     :members:
 
-.. autoclass:: datatc.data_directory.TransformedDataDirectory
+.. autoclass:: datatc.data_directory.SelfAwareDataDirectory
     :members:
 
 
@@ -25,9 +25,9 @@ DataFile
 .. autoclass:: datatc.data_directory.DataFile
     :members:
 
-TransformedData
+SelfAwareData
 ---------------
 
-.. autoclass:: datatc.data_transformer.TransformedData
+.. autoclass:: datatc.data_transformer.SelfAwareData
     :members:
 

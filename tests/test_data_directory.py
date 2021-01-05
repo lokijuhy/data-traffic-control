@@ -125,7 +125,7 @@ class TestDataDirectory(unittest.TestCase):
 
     # === SAVE ===
 
-    def test_save_file_adds_to_dir_contents(self):
+    def test_save_adds_to_dir_contents(self):
         initial_directory_contents = {}
         file_name = 'file.test'
         expected_file_path = '$HOME/{}'.format(file_name)
@@ -133,7 +133,7 @@ class TestDataDirectory(unittest.TestCase):
 
         data_directory = DataDirectory(path='$HOME', contents=initial_directory_contents,
                                        data_interface_manager=TestDataInterfaceManager)
-        data_directory.save_file(42, file_name)
+        data_directory.save(42, file_name)
 
         # check that the contents keys (the file names) are the same
         self.assertEqual(data_directory.contents.keys(), expected_directory_contents_after_save.keys())

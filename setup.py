@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 URL = "https://github.com/uzh-dqbm-cmi/data-traffic-control"
 PROJECT_URLS = {
@@ -11,14 +11,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='datatc',
-      version='0.0.4',
+      version='0.0.5',
       author="Laura Kinkead",
       description='Automate every-day interactions with your data.',
       long_description=long_description,
       long_description_content_type="text/markdown",
       url=URL,
       project_urls=PROJECT_URLS,
-      packages=['datatc', ],
+      packages=find_packages(),
       classifiers=[
             "Programming Language :: Python :: 3",
             "License :: OSI Approved :: MIT License",

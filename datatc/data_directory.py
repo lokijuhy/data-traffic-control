@@ -1,10 +1,10 @@
 import glob
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Dict, List, Union
 
 from datatc.data_interface import DataInterfaceManager
-from datatc.data_transformer import TransformedData, TransformedDataInterface
+from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface
 
 
 DIRS_TO_IGNORE = ['__pycache__']
@@ -88,8 +88,7 @@ class DataDirectory:
         latest_content = sorted_contents[-1]
         return self.contents[latest_content]
 
-    def save(self, data: Any, file_name: str, transformer_func: Callable = None, enforce_clean_git: bool = True,
-             get_git_hash_from: Any = None, **kwargs) -> None:
+    def save(self, data: Any, file_name: str, **kwargs) -> None:
         """
         Save a data object within the data directory.
 
@@ -97,33 +96,24 @@ class DataDirectory:
             data: data object to save.
             file_name: file name for the saved object, including file extension. The file extension is used to determine
                 the file type and method for saving the data.
-            transformer_func: Transformation function to run on the data object before saving. If provided,
-                the result will be saved as a `TransformedDataDirectory`.
-            enforce_clean_git: Whether to require a clean git state before proceeding with the save.
-            get_git_hash_from: Package to get the git hash metadata from. Useful if the `transformer_func` is not
-                defined within a git repo.
             **kwargs: Remaining args are passed to the data interface save function.
 
         """
 
-        if transformer_func is None:
-            self.save_file(data, file_name, **kwargs)
+        if type(data) == SelfAwareData:
+            new_data_dir = self._save_self_aware_data(data, file_name, **kwargs)
         else:
-            self.transform_and_save(data, transformer_func, file_name, enforce_clean_git, get_git_hash_from, **kwargs)
+            new_data_dir = self._save_file(data, file_name, **kwargs)
+        self.contents[new_data_dir.name] = new_data_dir
 
-    def save_file(self, data: Any, file_name: str, **kwargs) -> None:
+    def _save_file(self, data: Any, file_name: str, **kwargs) -> 'DataFile':
         data_interface = self.data_interface_manager.select(file_name)
         saved_file_path = data_interface.save(data, file_name, self.path, **kwargs)
-        self.contents[file_name] = DataFile(saved_file_path)
+        return DataFile(saved_file_path)
 
-    def transform_and_save(self, data: Any, transformer_func: Callable, file_name: str, enforce_clean_git=True,
-                           get_git_hash_from: Any = None, **kwargs) -> None:
-        new_transform_dir_path = TransformedDataInterface.save(data, transformer_func, parent_path=self.path,
-                                                               file_name=file_name, enforce_clean_git=enforce_clean_git,
-                                                               get_git_hash_from=get_git_hash_from, **kwargs)
-        base_name = os.path.basename(new_transform_dir_path)
-        self.contents[base_name] = TransformedDataDirectory(new_transform_dir_path)
-        return
+    def _save_self_aware_data(self, data: Any, file_name: str, **kwargs) -> 'SelfAwareDataDirectory':
+        new_transform_dir_path = SelfAwareDataInterface.save(data, parent_path=self.path, file_name=file_name, **kwargs)
+        return SelfAwareDataDirectory(new_transform_dir_path)
 
     def load(self):
         raise NotImplementedError("Loading the entire contents of a directory has not yet been implemented!")
@@ -148,10 +138,11 @@ class DataDirectory:
             if name in DIRS_TO_IGNORE:
                 continue
             if os.path.isdir(p):
-                if 'transformed_data_dir' in p:
-                    contents[name] = TransformedDataDirectory(p)
+                if 'sad_dir' in p or 'transformed_data_dir' in p:
+                    data_directory = SelfAwareDataDirectory(p)
                 else:
-                    contents[name] = DataDirectory(p)
+                    data_directory = DataDirectory(p)
+                contents[data_directory.name] = data_directory
             elif os.path.isfile(p):
                 contents[name] = DataFile(p)
             else:
@@ -228,35 +219,46 @@ class DataDirectory:
                         self._print_ls_tree(item, indent+1)
 
 
-class TransformedDataDirectory(DataDirectory):
-    """Subclass of `DataDirectory` that manages interacting with the file expression of TransformedData."""
+class SelfAwareDataDirectory(DataDirectory):
+    """Subclass of `DataDirectory` that manages interacting with the file expression of SelfAwareData."""
 
     def __init__(self, path, contents=None):
         super().__init__(path, contents)
 
-    def _determine_data_type(self):
-        return TransformedDataInterface.get_info(self.path)['data_type']
+        # Overwrite the name (normally os.path.basename) with effective file name
+        self.name = self._get_printable_filename()
 
-    def load(self, data_interface_hint: str = None, load_function: bool = True, **kwargs) -> 'TransformedData':
+    def _determine_data_type(self):
+        return SelfAwareDataInterface.get_info(self.path)['data_type']
+
+    def load(self, data_interface_hint: str = None, load_function: bool = True, **kwargs) -> 'SelfAwareData':
         """
         Load a saved data transformer- the data and the function that generated it.
 
         Args:
             data_interface_hint: file extension indicating the data interface to use to load the file.
-            load_function: Whether to load the transformation function of the TransformedData object. Specify False if
+            load_function: Whether to load the transformation function of the SelfAwareData object. Specify False if
                 the current environment does not support the dependencies of the transformation function.
             **kwargs: Remaining args are passed to the data interface save function.
         """
-        return TransformedDataInterface.load(self.path, data_interface_hint, load_function, **kwargs)
+        return SelfAwareDataInterface.load(self.path, data_interface_hint, load_function, **kwargs)
 
     def get_info(self) -> Dict[str, str]:
-        """Get metadata about the `TransformedData` object."""
-        return TransformedDataInterface.get_info(self.path)
+        """Get metadata about the `SelfAwareData` object."""
+        return SelfAwareDataInterface.get_info(self.path)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
-        info = TransformedDataInterface.get_info(self.path)
-        ls_description = '{}.{}  ({}, {})'.format(info['tag'], info['data_type'], info['timestamp'], info['git_hash'])
+        printable_filename = self._get_printable_filename()
+        info = SelfAwareDataInterface.get_info(self.path)
+        ls_description = '{}  ({}, {})'.format(printable_filename, info['timestamp'], info['git_hash'])
         return {ls_description: []}
+
+    def _get_printable_filename(self) -> str:
+        """Build the filename that should be printed to describe the TransformedDataDirectory.
+         The filename is created based on the TransformedDataDirectory tag and file type."""
+        info = SelfAwareDataInterface.get_info(self.path)
+        effective_filename = '{}.{}'.format(info['tag'], info['data_type'])
+        return effective_filename
 
 
 class DataFile(DataDirectory):

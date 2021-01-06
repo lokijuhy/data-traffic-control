@@ -168,7 +168,7 @@ There are 2 ways to save ``SelfAwareData`` objects.
 
 >>> dm['directory'].save(sad, output_file_name)
 
-2. You can also save ``SelfAwareData``, independently, without using ``DataMnager``.
+2. You can also save ``SelfAwareData``, independently, without using ``DataManager``.
 
 >>> sad.save(output_file_path)
 

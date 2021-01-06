@@ -162,12 +162,15 @@ For example, you can:
 Save
 ''''
 
-Saving your ``SelfAwareData`` works the same as saving any other file in ``datatc``.
+There are 2 ways to save ``SelfAwareData`` objects.
 
-.. code-block:: python
+1. If you are using ``DataManager``, then saving your ``SelfAwareData`` works the same as saving any other file with ``DataManager``.
 
-    dm['directory'].save(sad, output_file_name)
+>>> dm['directory'].save(sad, output_file_name)
 
+2. You can also save ``SelfAwareData``, independently, without using ``DataManager``.
+
+>>> sad.save(output_file_path)
 
 
 `SelfAwareData` objects automatically track their own metadata
@@ -229,6 +232,15 @@ To rerun the same transformation function on a new data object:
 
 >>> sad.rerun(new_df)
 
+Loading `SelfAwareData` objects without ``DataManager``
+.......................................................
+
+Just like with saving, you can also load ``SelfAwareData`` objects without going through ``DataManager``.
+
+>>> sad = SelfAwareData.load(file_path)
+
+However, ``SelfAwareData`` objects are saved to the file system as directories with long names, like ``sad_dir__2021-01-01_12-00__3002f4d__transform_1``.
+When you interact with ``SelfAwareData`` via ``DataManager``, you can reference them like normal files (``transform_1.csv``), however, referencing them outside of ``DataMaanger`` is not as easy.
 
 Loading `SelfAwareData` objects in dependency-incomplete environments
 .............................................................................

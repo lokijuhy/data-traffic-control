@@ -8,10 +8,6 @@ from typing import Any, Callable, Dict, List, Tuple
 from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
 from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from datatc.data_directory import DataDirectory, SelfAwareDataDirectory
-
 
 class SelfAwareData:
     """A wrapper around a dataset that also contains the code that generated the data.
@@ -97,41 +93,35 @@ class SelfAwareData:
     def git_hash(self):
         return self.info.get('git_hash', '')
 
-    def save(self, data_directory: 'DataDirectory', file_name: str,  **kwargs) -> Path:
+    def save(self, file_path: str,  **kwargs) -> Path:
         """
-        Saving a SelfAwareData object.
+        Save a SelfAwareData object.
 
         Args:
-            data_directory: The data directory in which to save the SelfAwareData.
-            file_name: Name to give the saved file, including file extension.
+            file_path: Path for where to save the SAD, including file extension.
 
-        Returns:
+        Returns: Path to the saved SAD
 
         Example Usage:
-            >>> dm = DataManager('path')
-            >>> raw_df = dm['raw'].latest().load()
-            >>> raw_sad = SelfAwareData(raw_df)
             >>> processed_sad = raw_sad.transform(build_features, 'standard_features')
-            >>> processed_sad.save(dm['feature_engineering'])
+            >>> processed_sad.save('~/project/data/standard_features.csv')
         """
-
-        # TODO: convert DataDirectory to path/str
-        return SelfAwareDataInterface.save(self, data_directory.path, file_name, **kwargs)
+        dir_path = os.path.dirname(file_path)
+        file_name = os.path.basename(file_path)
+        return SelfAwareDataInterface.save(self, dir_path, file_name, **kwargs)
 
     @classmethod
-    def load(cls, transformed_data_dir: 'SelfAwareDataDirectory', data_interface_hint=None, **kwargs
-             ) -> 'SelfAwareData':
+    def load(cls, file_path: str, data_interface_hint=None, **kwargs) -> 'SelfAwareData':
         """
-        Alternative public method for loading a TransformedData.
+        Load a SelfAwareData object.
 
-        #TODO: remove this method?
+        Args:
+            file_path: Path to the SAD to load.
 
         Example Usage:
-            >>> dm = DataManager('path')
-            >>> fe_dir = dm['feature_engineering'].latest()
-            >>> SelfAwareData.load(fe_dir)
+            >>> sad = SelfAwareData.load('~/project/data/sad_dir__2021-01-01_12-00__standard_features.csv')
         """
-        return SelfAwareDataInterface.load(transformed_data_dir, data_interface_hint, **kwargs)
+        return SelfAwareDataInterface.load(file_path, data_interface_hint, **kwargs)
 
 
 class SelfAwareDataInterface:

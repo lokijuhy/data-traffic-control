@@ -1,38 +1,45 @@
+from copy import deepcopy
 import datetime
 import glob
 import inspect
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
-from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash
+from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_from_path
 
 
-class SelfAwareData:
-    """A wrapper around a dataset that also contains the code that generated the data.
-     `SelfAwareData` can re-run it's transformer function on a new dataset."""
+class TransformStep:
 
-    def __init__(self, data: Any, transformer_func: Callable = None, code: str = None, info: Dict = None):
-        self.data = data
+    def __init__(self, data: Any, transformer_func: Callable, tag: str = '', enforce_clean_git: bool = True,
+                 get_git_hash_from: Any = None, **kwargs):
+
+        self.tag = tag
         self.transformer_func = transformer_func
-        self.code = code
-        self.info = info
+        self.kwargs = kwargs
+        self.code = inspect.getsource(transformer_func)
+        self.git_hash = self.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
+        self.data = transformer_func(data, **kwargs)
 
-    def transform(self, transformer_func: Callable, tag: str = '', enforce_clean_git=True,
-                  get_git_hash_from: Any = None, **kwargs) -> 'SelfAwareData':
+    def rerun(self, data: Any) -> Any:
+        return self.transformer_func(data, **self.kwargs)
+
+    @staticmethod
+    def get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git: bool = True) -> Union[str, None]:
         """
-        Transform a SelfAwareData, generating a new SelfAwareData object.
 
         Args:
-            transformer_func: Transform function to apply to data.
-            tag: (optional) short description of the transform for reference
+            transformer_func:
             enforce_clean_git: Whether to only allow the save to proceed if the working state of the git directory is
                 clean.
             get_git_hash_from: Locally installed module from which to get git information. Use this arg if
                 transform_func is defined outside of a module tracked by git.
 
-        Returns: new transform directory name, for adding to contents dict.
+        Returns: string of the git hash if the transformer_func is in a repo, otherwise None.
+
+        Raises: RuntimeError if there are uncommitted changes in the transformer_func's repo. Can be overrridden by
+            `enforce_clean_git = False`.
         """
         if get_git_hash_from:
             transformer_func_file_repo_path = get_git_repo_of_func(get_git_hash_from)
@@ -47,51 +54,103 @@ class SelfAwareData:
                 raise RuntimeError('`transformer_func` is not tracked in a git repo.'
                                    'Use `enforce_clean_git=False` to override this restriction.')
 
-        git_hash = get_git_hash(transformer_func_file_repo_path) if transformer_func_in_repo else None
+        git_hash = get_git_hash_from_path(transformer_func_file_repo_path) if transformer_func_in_repo else None
+        return git_hash
 
-        transformer_func_code = inspect.getsource(transformer_func)
-
-        info = {
-            'timestamp': SelfAwareDataInterface.generate_timestamp(),
-            'git_hash': git_hash,
-            'tag': tag,
+    def get_info(self):
+        return {
+            'tag': self.tag,
+            'code': self.code,
+            'kwargs': self.kwargs,
+            'git_hash': self.git_hash,
         }
 
-        transformed_data = transformer_func(self.data, **kwargs)
 
-        return SelfAwareData(transformed_data, transformer_func, transformer_func_code, info)
+class TransformSequence:
+
+    def __init__(self):
+        self.sequence = []
+
+    def append(self, transform_step: TransformStep):
+        self.sequence.append(transform_step)
+
+    def rerun(self, data: Any) -> Any:
+        transformed_data = deepcopy(data)
+        for step in self.sequence:
+            transformed_data = step.rerun(transformed_data)
+        return transformed_data
+
+    def is_not_empty(self):
+        return len(self.sequence) > 0
+
+    def get_last_data(self):
+        return self.sequence[-1].data
+
+    def get_info(self):
+        info_list = []
+        for step in self.sequence:
+            info_list.append(step.get_info())
+        return info_list
+
+    def view_code(self):
+        for i, step in enumerate(self.sequence):
+            print("Step {}".format(i))
+            print("-"*80)
+            print(step.code)
+            print()
+
+
+class SelfAwareData:
+    """A wrapper around a dataset that also contains the code that generated the data.
+     `SelfAwareData` can re-run it's transformer functions on a new dataset."""
+
+    def __init__(self, data: Any):
+        self.start_data = data
+        self.transform_sequence = TransformSequence()
 
     @property
-    def func(self) -> Callable:
-        """The transformation function that generated the data."""
-        return self.transformer_func
+    def data(self) -> Any:
+        if self.transform_sequence.is_not_empty():
+            return self.transform_sequence.get_last_data()
+        else:
+            return self.start_data
 
-    def rerun(self, *args, **kwargs) -> Any:
+    def get_info(self):
+        return self.transform_sequence.get_info()
+
+    def transform(self, transformer_func: Callable, tag: str = '', enforce_clean_git=True,
+                  get_git_hash_from: Any = None, **kwargs):
+        """
+        Transform a SelfAwareData, generating a new SelfAwareData object.
+
+        Args:
+            transformer_func: Transform function to apply to data.
+            tag: (optional) short description of the transform for reference
+            enforce_clean_git: Whether to only allow the save to proceed if the working state of the git directory is
+                clean.
+            get_git_hash_from: Locally installed module from which to get git information. Use this arg if
+                transform_func is defined outside of a module tracked by git.
+
+        Returns: new transform directory name, for adding to contents dict.
+        """
+        transform_step = TransformStep(self.data, transformer_func, tag, enforce_clean_git=enforce_clean_git,
+                                       get_git_hash_from=get_git_hash_from, **kwargs)
+        self.transform_sequence.append(transform_step)
+
+    def rerun(self, data) -> Any:
         """
         Rerun the same transformation function that generated this `SelfAwareData` on a new data object.
         Args:
-            *args:
-            **kwargs:
+            data:
 
         Returns:
 
         """
-        if self.transformer_func is not None:
-            return self.transformer_func(*args, **kwargs)
-        else:
-            raise ValueError('SelfAwareData Function was not loaded')
+        return self.transform_sequence.rerun(data)
 
     def view_code(self):
-        """Print the code of the transformation function that generated the data."""
-        print(self.code)
-
-    @property
-    def tag(self):
-        return self.info.get('tag', '')
-
-    @property
-    def git_hash(self):
-        return self.info.get('git_hash', '')
+        """Print the code of the transformation steps that generated the data."""
+        self.transform_sequence.view_code()
 
     def save(self, file_path: str,  **kwargs) -> Path:
         """

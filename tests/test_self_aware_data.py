@@ -97,3 +97,23 @@ class TestSelfAwareData(unittest.TestCase):
         self.assertTrue(set(info.keys()) == expected_keys)
         for key in expected_info:
             self.assertEqual(info[key], expected_info[key])
+
+    def test_save_untransformed(self):
+        raw_sad = SelfAwareData(self.raw_df)
+
+        sad_file_path = raw_sad.save(Path(self.test_dir, 'raw_sad.csv'), index=False)
+
+        # assert a new directory was created, and the path matches the return value
+        self.assertTrue(Path(sad_file_path).exists())
+
+        # assert the sad dir name starts with "sad_dir"
+        self.assertEqual(sad_file_path.stem[0:9], 'sad_dir__')
+
+        # assert the sad directory contains 3 files
+        sad_dir_contents = [f for f in Path(sad_file_path).iterdir()]
+        self.assertEqual(len(sad_dir_contents), 3)
+
+        # assert the sad dir contains a csv, dill, and txt file
+        contents_extensions = [f.suffix.replace('.', '') for f in sad_dir_contents]
+        for ext in ['csv', 'dill', 'txt']:
+            self.assertTrue(ext in contents_extensions)

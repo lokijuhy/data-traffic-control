@@ -4,26 +4,179 @@ import glob
 import inspect
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
-from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface
+from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface, YAMLDataInterface
 from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_from_path
+
+
+class TransformStepBase:
+
+    def __init__(self, **kwargs):
+        self.metadata = {}
+
+    def get_info(self) -> Dict:
+        raise NotImplementedError
+
+    def view_action(self) -> str:
+        raise NotImplementedError
+
+
+class LiveTransformStep(TransformStepBase):
+
+    def __init__(self, metadata: Dict, transformer_func: Callable):
+        """
+        Track a data transformation step.
+
+        Args:
+            metadata:
+            transformer_func:
+        """
+
+        super().__init__()
+        self.metadata = metadata
+        self.transformer_func = transformer_func
+
+    @property
+    def tag(self):
+        return self.metadata.get('tag', None)
+
+    @property
+    def git_hash(self):
+        return self.metadata.get('git_hash', None)
+
+    @property
+    def code(self):
+        return self.metadata.get('code', None)
+
+    @property
+    def kwargs(self):
+        return self.metadata.get('kwargs', {})
+
+    def get_info(self):
+        # TODO: transform timestamps?!
+        return {
+            'tag': self.tag,
+            'code': self.code,
+            'kwargs': self.kwargs,
+            'git_hash': self.git_hash,
+        }
+
+    def view_action(self) -> str:
+        return self.code
+
+    def rerun(self, data: Any) -> Any:
+        return self.transformer_func(data, **self.kwargs)
+
+
+class StaticTransformStep(TransformStepBase):
+
+    def __init__(self, metadata: Dict):
+        """
+        Track a data transformation step.
+
+        Args:
+            metadata:
+        """
+
+        super().__init__()
+        self.metadata = metadata
+
+    @property
+    def tag(self):
+        return self.metadata.get('tag', None)
+
+    @property
+    def git_hash(self):
+        return self.metadata.get('git_hash', None)
+
+    @property
+    def code(self):
+        return self.metadata.get('code', None)
+
+    @property
+    def kwargs(self):
+        return self.metadata.get('kwargs', {})
+
+    def get_info(self):
+        return {
+            'tag': self.tag,
+            'code': self.code,
+            'kwargs': self.kwargs,
+            'git_hash': self.git_hash,
+        }
+
+    def view_action(self) -> str:
+        return self.code
+
+
+class FileSourceTransformStep(TransformStepBase):
+
+    def __init__(self, file_path: str):
+        """
+        Track a data transformation step.
+
+        Args:
+            file_path:
+        """
+
+        super().__init__()
+        self.file_path = file_path
+
+    def get_info(self):
+        return {
+            'file_path': self.file_path,
+        }
+
+    def view_action(self) -> str:
+        return 'Source file: {}'.format(self.file_path)
+
+
+class TransformStepFactory:
+
+    def create(self, metadata: Dict = None, transform_func: Callable = None, file_path: str = None):
+        if transform_func is not None:
+            return self.load_live(metadata, transform_func)
+
+        elif file_path is not None:
+            return self.from_file_path(file_path)
+
+        else:
+            return self.load_static(metadata)
+
+    @staticmethod
+    def load_live(metadata: Dict, transform_func: Callable) -> 'LiveTransformStep':
+        return LiveTransformStep(metadata, transform_func)
+
+    @staticmethod
+    def load_static(metadata: Dict) -> 'StaticTransformStep':
+        return StaticTransformStep(metadata)
+
+    @staticmethod
+    def from_file_path(file_path: str) -> 'FileSourceTransformStep':
+        return FileSourceTransformStep(file_path)
 
 
 class TransformStep:
 
-    def __init__(self, data: Any, transformer_func: Callable, tag: str = '', enforce_clean_git: bool = True,
-                 get_git_hash_from: Any = None, **kwargs):
+    @classmethod
+    def execute(cls, data: Any, transformer_func: Callable, tag: str = '', enforce_clean_git: bool = True,
+                get_git_hash_from: Any = None, **kwargs) -> Union[Any, Type[TransformStepBase]]:
+        code = inspect.getsource(transformer_func)
+        git_hash = cls.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
+        metadata = {
+            'code': code,
+            'git_hash': git_hash,
+            'kwargs': kwargs,
+        }
+        if tag is not None:
+            metadata['tag'] = tag
+        data = transformer_func(data, **kwargs)
+        return data, LiveTransformStep(metadata, transformer_func)
 
-        self.tag = tag
-        self.transformer_func = transformer_func
-        self.kwargs = kwargs
-        self.code = inspect.getsource(transformer_func)
-        self.git_hash = self.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
-        self.data = transformer_func(data, **kwargs)
-
-    def rerun(self, data: Any) -> Any:
-        return self.transformer_func(data, **self.kwargs)
+    @classmethod
+    def load(cls, **kwargs):
+        return TransformStepFactory.create(**kwargs)
 
     @staticmethod
     def get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git: bool = True) -> Union[str, None]:
@@ -54,37 +207,36 @@ class TransformStep:
                 raise RuntimeError('`transformer_func` is not tracked in a git repo.'
                                    'Use `enforce_clean_git=False` to override this restriction.')
 
-        git_hash = get_git_hash_from_path(transformer_func_file_repo_path) if transformer_func_in_repo else None
-        return git_hash
-
-    def get_info(self):
-        return {
-            'tag': self.tag,
-            'code': self.code,
-            'kwargs': self.kwargs,
-            'git_hash': self.git_hash,
-        }
+        if transformer_func_in_repo:
+            return get_git_hash_from_path(transformer_func_file_repo_path)
+        else:
+            return 'no_git_hash'
 
 
 class TransformSequence:
 
-    def __init__(self):
-        self.sequence = []
+    def __init__(self, metadata: List[Dict] = None):
+        if metadata is None:
+            self.sequence = []
+        else:
+            self.sequence = self.build_from_metadata(metadata)
 
-    def append(self, transform_step: TransformStep):
+    def append(self, transform_step: Type[TransformStepBase]):
         self.sequence.append(transform_step)
 
     def rerun(self, data: Any) -> Any:
+        live_steps = [step for step in self.sequence if type(step) == LiveTransformStep]
+        if len(live_steps) == 0:
+            raise RuntimeError('This TransformSequence contains no re-runable steps.')
+
         transformed_data = deepcopy(data)
-        for step in self.sequence:
-            transformed_data = step.rerun(transformed_data)
+        for step in live_steps:
+            if type(step) == LiveTransformStep:
+                transformed_data = step.rerun(transformed_data)
         return transformed_data
 
     def is_not_empty(self):
         return len(self.sequence) > 0
-
-    def get_last_data(self):
-        return self.sequence[-1].data
 
     def get_info(self):
         info_list = []
@@ -92,34 +244,54 @@ class TransformSequence:
             info_list.append(step.get_info())
         return info_list
 
+    @classmethod
+    def build_from_metadata(cls, metadata: List[Dict]) -> List[TransformStepBase]:
+        sequence = []
+        for entry in metadata:
+            step = TransformStep.load(metadata=entry)
+            sequence.append(step)
+        return sequence
+
     def view_code(self):
         for i, step in enumerate(self.sequence):
             print("Step {}".format(i))
             print("-"*80)
-            print(step.code)
+            print(step.view_action())
             print()
 
 
 class SelfAwareData:
     """A wrapper around a dataset that also contains the code that generated the data.
-     `SelfAwareData` can re-run it's transformer functions on a new dataset."""
+     `SelfAwareData` can re-run it's transformation steps on a new dataset."""
 
-    def __init__(self, data: Any):
-        self.start_data = data
-        self.transform_sequence = TransformSequence()
+    def __init__(self, data: Any, metadata: Union[Dict, TransformSequence] = None):
+        self.data = data
+        self.transform_sequence = self._load_transform_seq_from_metadata(metadata)
 
-    @property
-    def data(self) -> Any:
-        if self.transform_sequence.is_not_empty():
-            return self.transform_sequence.get_last_data()
+    @classmethod
+    def load_from_path(cls, file_path: str) -> 'SelfAwareData':
+        # TODO: write test that this creates a FileSourceTransformationStep
+        data_interface = DataInterfaceManager.select(file_path)
+        data = data_interface.load(file_path)
+        return cls(data, {'file_path': file_path})
+
+    @staticmethod
+    def _load_transform_seq_from_metadata(metadata: Union[List[Dict], TransformSequence]):
+        if metadata is None:
+            return TransformSequence()
+        elif type(metadata) == TransformSequence:
+            return metadata
+        elif type(metadata) == List:
+            return TransformSequence.build_from_metadata(metadata)
         else:
-            return self.start_data
+            raise ValueError('Metadata type {} is not valid, must be type List or TransformSequence'
+                             ''.format(type(metadata)))
 
     def get_info(self):
         return self.transform_sequence.get_info()
 
     def transform(self, transformer_func: Callable, tag: str = '', enforce_clean_git=True,
-                  get_git_hash_from: Any = None, **kwargs):
+                  get_git_hash_from: Any = None, **kwargs) -> 'SelfAwareData':
         """
         Transform a SelfAwareData, generating a new SelfAwareData object.
 
@@ -133,9 +305,17 @@ class SelfAwareData:
 
         Returns: new transform directory name, for adding to contents dict.
         """
-        transform_step = TransformStep(self.data, transformer_func, tag, enforce_clean_git=enforce_clean_git,
-                                       get_git_hash_from=get_git_hash_from, **kwargs)
-        self.transform_sequence.append(transform_step)
+        transformed_data, transform_step = TransformStep.execute(self.data, transformer_func, tag,
+                                                                 enforce_clean_git=enforce_clean_git,
+                                                                 get_git_hash_from=get_git_hash_from, **kwargs)
+        new_sad = self._copy_and_extend(transformed_data, transform_step)
+        return new_sad
+
+    def _copy_and_extend(self, transformed_data, transform_step) -> 'SelfAwareData':
+        """Generate a new SAD object from the existing one, adding an additional step"""
+        new_sad = SelfAwareData(transformed_data, deepcopy(self.transform_sequence))
+        new_sad.transform_sequence.append(transform_step)
+        return new_sad
 
     def rerun(self, data) -> Any:
         """
@@ -183,9 +363,65 @@ class SelfAwareData:
         return SelfAwareDataInterface.load(file_path, data_interface_hint, **kwargs)
 
 
-class SelfAwareDataInterface:
+class SelfAwareDataInterfaceVersion:
+
+    version = None
+    file_component_interfaces = {}
+
+    @classmethod
+    def save(cls, sad: SelfAwareData, parent_path: str, file_name: str,  **kwargs) -> Path:
+        raise NotImplementedError
+
+    @classmethod
+    def load(cls, path: str, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'SelfAwareData':
+        raise NotImplementedError
+
+    @classmethod
+    def get_info(cls, path: str) -> Dict[str, str]:
+        raise NotImplementedError
+
+    @classmethod
+    def _generate_name_for_transform_dir(cls, git_hash: str, tag: str = None) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    def _parse_transform_dir_name(cls, path) -> Tuple[str, str, str]:
+        raise NotImplementedError
+
+    @classmethod
+    def _identify_transform_sub_files(cls, path: str) -> Dict[str, Path]:
+        glob_path = Path(path, '*')
+        subpaths = glob.glob(glob_path.__str__())
+        file_map = {}
+        for file_component in cls.file_component_interfaces:
+            file_map[file_component] = cls._identify_sub_file(subpaths, file_component)
+        return file_map
+
+    @classmethod
+    def _identify_sub_file(cls, file_contents: List[Path], key: str) -> Path:
+        options = [file_path for file_path in file_contents if key in os.path.basename(file_path)]
+        if len(options) == 0:
+            raise ValueError('No {} file found for SelfAwareData'.format(key))
+        elif len(options) > 1:
+            raise ValueError('More than one {} file found for SelfAwareData: {}'.format(key, ', '.join(options)))
+        else:
+            return options[0]
+
+    @classmethod
+    def generate_timestamp(cls):
+        return datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+    @classmethod
+    def _parse_timestamp_for_printing(cls, timestamp):
+        date, time = timestamp.split('_')
+        hours, minutes, seconds = time.split('-')
+        return '{} {}:{}'.format(date, hours, minutes)
+
+
+class SelfAwareDataInterface_v0(SelfAwareDataInterfaceVersion):
     """DataInterface for saving and loading `SelfAwareData` objects."""
 
+    version = 0
     file_component_interfaces = {
         'data': None,
         'func': DillDataInterface,
@@ -207,7 +443,7 @@ class SelfAwareDataInterface:
         """
 
         tag, data_file_type = os.path.splitext(file_name)
-        transform_dir_name = cls._generate_name_for_transform_dir(tag, sad.git_hash)
+        transform_dir_name = cls._generate_name_for_transform_dir(sad.git_hash, tag)
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
@@ -264,26 +500,7 @@ class SelfAwareDataInterface:
         }
 
     @classmethod
-    def _identify_transform_sub_files(cls, path: str) -> Dict[str, Path]:
-        glob_path = Path(path, '*')
-        subpaths = glob.glob(glob_path.__str__())
-        file_map = {}
-        for file_component in cls.file_component_interfaces:
-            file_map[file_component] = cls._identify_sub_file(subpaths, file_component)
-        return file_map
-
-    @classmethod
-    def _identify_sub_file(cls, file_contents: List[Path], key: str) -> Path:
-        options = [file_path for file_path in file_contents if key in os.path.basename(file_path)]
-        if len(options) == 0:
-            raise ValueError('No {} file found for SelfAwareData'.format(key))
-        elif len(options) > 1:
-            raise ValueError('More than one {} file found for SelfAwareData: {}'.format(key, ', '.join(options)))
-        else:
-            return options[0]
-
-    @classmethod
-    def _generate_name_for_transform_dir(cls, tag: str = None, git_hash: str = None) -> str:
+    def _generate_name_for_transform_dir(cls, git_hash: str, tag: str = None) -> str:
         timestamp = cls.generate_timestamp()
         delimiter_char = '__'
         file_name_components = ['sad_dir', timestamp, git_hash]
@@ -305,12 +522,169 @@ class SelfAwareDataInterface:
             raise ValueError('SelfAwareDataDirectory name could not be parsed: {}'.format(dir_name))
         return timestamp, git_hash, tag
 
-    @classmethod
-    def generate_timestamp(cls):
-        return datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+class SelfAwareDataInterface_v1(SelfAwareDataInterfaceVersion):
+    """DataInterface for saving and loading `SelfAwareData` objects."""
+
+    version = 1
+    file_component_interfaces = {
+        'data': None,
+        'sad': DillDataInterface,
+        'provenance': YAMLDataInterface,
+    }
 
     @classmethod
-    def _parse_timestamp_for_printing(cls, timestamp):
-        date, time = timestamp.split('_')
-        hours, minutes, seconds = time.split('-')
-        return '{} {}:{}'.format(date, hours, minutes)
+    def save(cls, sad: SelfAwareData, parent_path: str, file_name: str,  **kwargs) -> Path:
+        """
+        Save a SelfAwareData object.
+
+        Args:
+            sad: a SelfAwareData object
+            parent_path: The parent path at which the new SelfAwareDataDirectory will be created.
+            file_name: The name will be converted into the tag, and the extension used to determine the type to save the
+             data as.
+
+        Returns: new transform directory name, for adding to contents dict.
+        """
+
+        tag, data_file_type = os.path.splitext(file_name)
+        transform_dir_name = cls._generate_name_for_transform_dir(tag)
+        new_transform_dir_path = Path(parent_path, transform_dir_name)
+        os.makedirs(new_transform_dir_path)
+
+        data_interface = DataInterfaceManager.select(data_file_type)
+        data_interface.save(sad.data, 'data', new_transform_dir_path, **kwargs)
+
+        cls.file_component_interfaces['sad'].save(sad, 'sad', new_transform_dir_path)
+
+        metadata = {
+            'interface_version': cls.version,
+            'metadata': sad.get_info()
+        }
+        cls.file_component_interfaces['provenance'].save(metadata, 'provenance', new_transform_dir_path)
+
+        print('created new SAD directory {}'.format(new_transform_dir_path))
+        return new_transform_dir_path
+
+    @classmethod
+    def load(cls, path: str, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'SelfAwareData':
+        """
+        Load a saved data transformer- the data and the function that generated it.
+
+        Args:
+            path: The path to the directory that contains the file contents of the SelfAwareData
+            data_interface_hint: Optional, what data interface to use to read the data file.
+            load_function: Whether to load the dill'ed function. May want to not load if dependencies are not present in
+             current environment, which would cause a ModuleNotFoundError.
+
+        Returns: Tuple(data, transformer_func)
+
+        """
+        file_map = cls._identify_transform_sub_files(path)
+        data_file = file_map['data']
+        sad_file = file_map['sad']
+        metadata_file = file_map['provenance']
+
+        if load_function:
+            sad = cls.file_component_interfaces['sad'].load(sad_file)
+            return sad
+        else:
+            data_interface = DataInterfaceManager.select(data_file, default_file_type=data_interface_hint)
+            data = data_interface.load(data_file, **kwargs)
+            metadata = cls.file_component_interfaces['provenance'].load(metadata_file)
+            # TODO: make function to add and extract version from metadata file
+            metadata = metadata['metadata']
+            return SelfAwareData(data, metadata)
+
+    @classmethod
+    def get_info(cls, path: str) -> Dict[str, str]:
+        file_map = cls._identify_transform_sub_files(path)
+        metadata_file = file_map['metadata']
+        metadata = cls.file_component_interfaces['metadata'].load(metadata_file)
+        return metadata
+
+    @classmethod
+    def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
+        timestamp = cls.generate_timestamp()
+        delimiter_char = '__'
+        file_name_components = ['sad_dir', timestamp]
+        if tag is not None:
+            file_name_components.append(tag)
+        return delimiter_char.join(file_name_components)
+
+    @classmethod
+    def _parse_transform_dir_name(cls, path) -> Tuple[str, str]:
+        delimiter_char = '__'
+        dir_name = os.path.basename(path)
+        dir_name_components = dir_name.split(delimiter_char)
+        if len(dir_name_components) == 2:
+            denoter, timestamp = dir_name_components
+            tag = ''
+        elif len(dir_name_components) == 3:
+            denoter, timestamp, tag = dir_name_components
+        else:
+            raise ValueError('SelfAwareDataDirectory name could not be parsed: {}'.format(dir_name))
+        return timestamp, tag
+
+
+class SADInterfaceVersionManagerBase:
+
+    def __init__(self):
+        self.version_map = {}
+        self.latest_version = None
+
+    def register(self, interface: Type[SelfAwareDataInterfaceVersion]):
+        version = interface.version
+        if version in self.version_map.keys():
+            raise ValueError('There is already an interface registered as version {}'.format(version))
+        self.version_map[version] = interface
+        self._update_latest_version(version)
+
+    def select_version_for_path(self, file_path: str) -> SelfAwareDataInterfaceVersion:
+        version = self.read_version_from_metadata_file(file_path)
+        if version not in self.version_map:
+            known_versions = list(self.version_map.keys())
+            raise RuntimeError('SAD Interface version not recognized: {}. Known versions: {}'.format(version,
+                                                                                                     known_versions))
+        return self.version_map[version]
+
+    @property
+    def latest(self) -> SelfAwareDataInterfaceVersion:
+        return self.version_map[self.latest_version]
+
+    def _update_latest_version(self, version: int):
+        if self.latest_version is None:
+            self.latest_version = version
+        elif all([version > registered_version for registered_version in self.version_map.keys()]):
+            self.latest_version = version
+
+    @classmethod
+    def read_version_from_metadata_file(cls, path: str) -> int:
+        metadata_path = Path(path, 'provenance.yaml')
+        if metadata_path.is_file():
+            metadata = YAMLDataInterface.load(metadata_path)
+            if 'interface_version' not in metadata:
+                raise RuntimeError('The SAD interface version could not be determined for {}'.format(path))
+            version = metadata['interface_version']
+        else:
+            version = 0
+        return version
+
+
+SADInterfaceVersionManager = SADInterfaceVersionManagerBase()
+# TODO: broken, doesnt let 1 be latest
+# SADInterfaceVersionManager.register(SelfAwareDataInterface_v0)
+SADInterfaceVersionManager.register(SelfAwareDataInterface_v1)
+
+
+class SelfAwareDataInterface:
+
+    @classmethod
+    def save(cls, sad: SelfAwareData, parent_path: str, file_name: str,  **kwargs) -> Path:
+        latest_interface = SADInterfaceVersionManager.latest
+        return latest_interface.save(sad, parent_path, file_name, **kwargs)
+
+    @classmethod
+    def load(cls, path: str, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'SelfAwareData':
+        versioned_interface = SADInterfaceVersionManager.select_version_for_path(path)
+        return versioned_interface.load(path, data_interface_hint, load_function, **kwargs)

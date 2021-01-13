@@ -13,11 +13,11 @@ class SelfAwareData:
     """A wrapper around a dataset that also contains the code that generated the data.
      `SelfAwareData` can re-run it's transformer function on a new dataset."""
 
-    def __init__(self, data: Any, transformer_func: Callable = None, code: str = None, info: Dict = None):
+    def __init__(self, data: Any, transformer_func: Callable = None, code: str = '', info: Dict = None):
         self.data = data
         self.transformer_func = transformer_func
         self.code = code
-        self.info = info
+        self.info = info if info is not None else {}
 
     def transform(self, transformer_func: Callable, tag: str = '', enforce_clean_git=True,
                   get_git_hash_from: Any = None, **kwargs) -> 'SelfAwareData':
@@ -47,7 +47,7 @@ class SelfAwareData:
                 raise RuntimeError('`transformer_func` is not tracked in a git repo.'
                                    'Use `enforce_clean_git=False` to override this restriction.')
 
-        git_hash = get_git_hash(transformer_func_file_repo_path) if transformer_func_in_repo else None
+        git_hash = get_git_hash(transformer_func_file_repo_path) if transformer_func_in_repo else 'no_git_hash'
 
         transformer_func_code = inspect.getsource(transformer_func)
 
@@ -91,7 +91,7 @@ class SelfAwareData:
 
     @property
     def git_hash(self):
-        return self.info.get('git_hash', '')
+        return self.info.get('git_hash', 'no_git_hash')
 
     def save(self, file_path: str,  **kwargs) -> Path:
         """
@@ -148,7 +148,7 @@ class SelfAwareDataInterface:
         """
 
         tag, data_file_type = os.path.splitext(file_name)
-        transform_dir_name = cls._generate_name_for_transform_dir(tag, sad.git_hash)
+        transform_dir_name = cls._generate_name_for_transform_dir(sad.git_hash, tag)
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
@@ -224,7 +224,7 @@ class SelfAwareDataInterface:
             return options[0]
 
     @classmethod
-    def _generate_name_for_transform_dir(cls, tag: str = None, git_hash: str = None) -> str:
+    def _generate_name_for_transform_dir(cls, git_hash: str, tag: str = None) -> str:
         timestamp = cls.generate_timestamp()
         delimiter_char = '__'
         file_name_components = ['sad_dir', timestamp, git_hash]

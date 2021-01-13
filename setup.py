@@ -27,7 +27,7 @@ setup(name='datatc',
             "Intended Audience :: Science/Research",
             "Topic :: Scientific/Engineering",
       ],
-      python_requires='>3.5.0',
+      python_requires='>3.7.0',
       install_requires=[
             'dill',
             'flake8',

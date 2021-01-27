@@ -38,6 +38,10 @@ class LiveTransformStep(TransformStepBase):
         self.transformer_func = transformer_func
 
     @property
+    def timestamp(self):
+        return self.metadata.get('timestamp', None)
+
+    @property
     def tag(self):
         return self.metadata.get('tag', None)
 
@@ -54,13 +58,7 @@ class LiveTransformStep(TransformStepBase):
         return self.metadata.get('kwargs', {})
 
     def get_info(self):
-        # TODO: transform timestamps?!
-        return {
-            'tag': self.tag,
-            'code': self.code,
-            'kwargs': self.kwargs,
-            'git_hash': self.git_hash,
-        }
+        return self.metadata
 
     def view_action(self) -> str:
         return self.code
@@ -83,6 +81,10 @@ class StaticTransformStep(TransformStepBase):
         self.metadata = metadata
 
     @property
+    def timestamp(self):
+        return self.metadata.get('timestamp', None)
+
+    @property
     def tag(self):
         return self.metadata.get('tag', None)
 
@@ -99,12 +101,7 @@ class StaticTransformStep(TransformStepBase):
         return self.metadata.get('kwargs', {})
 
     def get_info(self):
-        return {
-            'tag': self.tag,
-            'code': self.code,
-            'kwargs': self.kwargs,
-            'git_hash': self.git_hash,
-        }
+        return self.metadata
 
     def view_action(self) -> str:
         return self.code
@@ -165,6 +162,7 @@ class TransformStep:
         code = inspect.getsource(transformer_func)
         git_hash = cls.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
         metadata = {
+            'timestamp': cls.generate_timestamp(),
             'code': code,
             'git_hash': git_hash,
             'kwargs': kwargs,
@@ -177,6 +175,10 @@ class TransformStep:
     @classmethod
     def load(cls, **kwargs):
         return TransformStepFactory.create(**kwargs)
+
+    @classmethod
+    def generate_timestamp(cls):
+        return datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
     @staticmethod
     def get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git: bool = True) -> Union[str, None]:
@@ -290,6 +292,7 @@ class SelfAwareData:
     def get_info(self):
         return self.transform_sequence.get_info()
 
+    # TODO: add transform_merge method for combining?
     def transform(self, transformer_func: Callable, tag: str = '', enforce_clean_git=True,
                   get_git_hash_from: Any = None, **kwargs) -> 'SelfAwareData':
         """
@@ -378,6 +381,10 @@ class SelfAwareDataInterfaceVersion:
 
     @classmethod
     def get_info(cls, path: str) -> Dict[str, str]:
+        raise NotImplementedError
+
+    @classmethod
+    def get_data_type(cls, path: str) -> str:
         raise NotImplementedError
 
     @classmethod
@@ -500,6 +507,10 @@ class SelfAwareDataInterface_v0(SelfAwareDataInterfaceVersion):
         }
 
     @classmethod
+    def get_data_type(cls, path: str) -> str:
+        return cls.get_info(path)['data_type']
+
+    @classmethod
     def _generate_name_for_transform_dir(cls, git_hash: str, tag: str = None) -> str:
         timestamp = cls.generate_timestamp()
         delimiter_char = '__'
@@ -599,9 +610,15 @@ class SelfAwareDataInterface_v1(SelfAwareDataInterfaceVersion):
     @classmethod
     def get_info(cls, path: str) -> Dict[str, str]:
         file_map = cls._identify_transform_sub_files(path)
-        metadata_file = file_map['metadata']
-        metadata = cls.file_component_interfaces['metadata'].load(metadata_file)
+        metadata_file = file_map['provenance']
+        metadata = cls.file_component_interfaces['provenance'].load(metadata_file)
         return metadata
+
+    @classmethod
+    def get_data_type(cls, path: str) -> str:
+        file_map = cls._identify_transform_sub_files(path)
+        data_file_root, data_file_type = os.path.splitext(file_map['data'])
+        return data_file_type
 
     @classmethod
     def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
@@ -688,3 +705,8 @@ class SelfAwareDataInterface:
     def load(cls, path: str, data_interface_hint=None, load_function: bool = True, **kwargs) -> 'SelfAwareData':
         versioned_interface = SADInterfaceVersionManager.select_version_for_path(path)
         return versioned_interface.load(path, data_interface_hint, load_function, **kwargs)
+
+    @classmethod
+    def get_info(cls, path: str) -> List[Dict]:
+        versioned_interface = SADInterfaceVersionManager.select_version_for_path(path)
+        return versioned_interface.get_info(path)

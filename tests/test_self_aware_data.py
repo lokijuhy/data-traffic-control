@@ -66,7 +66,7 @@ class TestSelfAwareData(unittest.TestCase):
 
         # assert the sad dir contains a csv, dill, and txt file
         contents_extensions = [f.suffix.replace('.', '') for f in sad_dir_contents]
-        for ext in ['csv', 'dill', 'txt']:
+        for ext in ['csv', 'dill', 'yaml']:
             self.assertTrue(ext in contents_extensions)
 
         # TEST LOAD
@@ -85,18 +85,28 @@ class TestSelfAwareData(unittest.TestCase):
 
     def test_get_info(self):
         raw_sad = SelfAwareData(self.raw_df)
-        my_sad = raw_sad.transform(self.transform_func, enforce_clean_git=False)
+        my_sad = raw_sad.transform(self.transform_func, tag='new_sad', enforce_clean_git=False)
         sad_file_path = my_sad.save(Path(self.test_dir, 'new_sad.csv'), index=False)
 
+        # TODO: separately test SelfAwareData.get_info() and SelfAwareDataInterface.get_info()
         info = SelfAwareDataInterface.get_info(sad_file_path)
-        expected_keys = {'timestamp', 'git_hash', 'tag', 'data_type'}
+        self.assertEqual(type(info), dict)
+        expected_top_level_keys = {'interface_version', 'metadata'}
+        self.assertTrue(set(info.keys()) == expected_top_level_keys)
+
+        transform_info = info['metadata']
+
+        expected_transform_info_keys = {'timestamp', 'git_hash', 'tag', 'kwargs', 'code'}
         expected_info = {
             'tag': 'new_sad',
-            'data_type': 'csv',
+            'kwargs': {},
         }
-        self.assertTrue(set(info.keys()) == expected_keys)
+        self.assertEqual(len(transform_info), 1)  # 1 transform
+        transform_step_0_info = transform_info[0]
+        self.assertTrue(set(transform_step_0_info.keys()) == expected_transform_info_keys)
         for key in expected_info:
-            self.assertEqual(info[key], expected_info[key])
+            self.assertEqual(transform_step_0_info[key], expected_info[key])
+        # TODO: test for function args
 
     def test_save_untransformed(self):
         raw_sad = SelfAwareData(self.raw_df)
@@ -115,5 +125,5 @@ class TestSelfAwareData(unittest.TestCase):
 
         # assert the sad dir contains a csv, dill, and txt file
         contents_extensions = [f.suffix.replace('.', '') for f in sad_dir_contents]
-        for ext in ['csv', 'dill', 'txt']:
+        for ext in ['csv', 'dill', 'yaml']:
             self.assertTrue(ext in contents_extensions)

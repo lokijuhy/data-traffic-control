@@ -229,7 +229,7 @@ class SelfAwareDataDirectory(DataDirectory):
         self.name = self._get_printable_filename()
 
     def _determine_data_type(self):
-        return SelfAwareDataInterface.get_info(self.path)['data_type']
+        return SelfAwareDataInterface.get_data_type(self.path)
 
     def load(self, data_interface_hint: str = None, load_function: bool = True, **kwargs) -> 'SelfAwareData':
         """

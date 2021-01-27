@@ -18,7 +18,7 @@ class TransformStepBase:
     def get_info(self) -> Dict:
         raise NotImplementedError
 
-    def view_action(self) -> str:
+    def print_step(self, step_no) -> str:
         raise NotImplementedError
 
 
@@ -62,10 +62,19 @@ class LiveTransformStep(TransformStepBase):
         return self.metadata.get('kwargs', {})
 
     def get_info(self):
-        return self.metadata
+        return {
+            'timestamp': self.timestamp,
+            'tag': self.tag,
+            'code': self.code,
+            'kwargs': self.kwargs,
+            'git_hash': self.git_hash,
+        }
 
-    def view_action(self) -> str:
-        return self.code
+    def print_step(self, step_no) -> str:
+        print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
+        print("-" * 80)
+        print(self.code)
+        print()
 
     def rerun(self, data: Any) -> Any:
         return self.transformer_func(data, **self.kwargs)
@@ -107,10 +116,19 @@ class StaticTransformStep(TransformStepBase):
         return self.metadata.get('kwargs', {})
 
     def get_info(self):
-        return self.metadata
+        return {
+            'timestamp': self.timestamp,
+            'tag': self.tag,
+            'code': self.code,
+            'kwargs': self.kwargs,
+            'git_hash': self.git_hash,
+        }
 
-    def view_action(self) -> str:
-        return self.code
+    def print_step(self, step_no) -> str:
+        print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
+        print("-" * 80)
+        print(self.code)
+        print()
 
 
 class FileSourceTransformStep(TransformStepBase):
@@ -128,17 +146,37 @@ class FileSourceTransformStep(TransformStepBase):
 
     def get_info(self):
         return {
-            'file_path': self.file_path,
+            'file_path': str(self.file_path),
         }
 
-    def view_action(self) -> str:
-        return 'Source file: {}'.format(self.file_path)
+    def print_step(self, step_no) -> str:
+        print("Step {:>2}".format(step_no))
+        print("-" * 80)
+        print('Source file: {}'.format(self.file_path))
+        print()
 
 
-class TransformStepFactory:
+class TransformStepInterface:
 
     @classmethod
-    def create(cls, metadata: Dict = None, transform_func: Callable = None, file_path: str = None):
+    def execute(cls, data: Any, transformer_func: Callable, tag: str = '', enforce_clean_git: bool = True,
+                get_git_hash_from: Any = None, **kwargs) -> Union[Any, Type[TransformStepBase]]:
+        code = inspect.getsource(transformer_func)
+        git_hash = cls.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
+        metadata = {
+            'timestamp': cls.generate_timestamp(),
+            'code': code,
+            'git_hash': git_hash,
+            'kwargs': kwargs,
+        }
+        if tag is not None:
+            metadata['tag'] = tag
+        data = transformer_func(data, **kwargs)
+        return data, LiveTransformStep(metadata, transformer_func)
+
+    @classmethod
+    def load(cls, metadata: Dict = None, transform_func: Callable = None, file_path: str = None):
+        """Factory method for generating different subclasses of TransformSteps"""
         if transform_func is not None:
             return cls.load_live(metadata, transform_func)
 
@@ -159,29 +197,6 @@ class TransformStepFactory:
     @staticmethod
     def from_file_path(file_path: str) -> 'FileSourceTransformStep':
         return FileSourceTransformStep(file_path)
-
-
-class TransformStep:
-
-    @classmethod
-    def execute(cls, data: Any, transformer_func: Callable, tag: str = '', enforce_clean_git: bool = True,
-                get_git_hash_from: Any = None, **kwargs) -> Union[Any, Type[TransformStepBase]]:
-        code = inspect.getsource(transformer_func)
-        git_hash = cls.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
-        metadata = {
-            'timestamp': cls.generate_timestamp(),
-            'code': code,
-            'git_hash': git_hash,
-            'kwargs': kwargs,
-        }
-        if tag is not None:
-            metadata['tag'] = tag
-        data = transformer_func(data, **kwargs)
-        return data, LiveTransformStep(metadata, transformer_func)
-
-    @classmethod
-    def load(cls, **kwargs):
-        return TransformStepFactory.create(**kwargs)
 
     @classmethod
     def generate_timestamp(cls):
@@ -237,7 +252,7 @@ class TransformSequence:
                 elif type(first_element) is dict:
                     self.sequence = self.build_from_metadata(sequence)
                 else:
-                    raise ValueError('Sequence not recognized. Must be list of TransformStep or List of dict,'
+                    raise ValueError('Sequence not recognized. Must be list of TransformStepInterface or List of dict,'
                                      'received list of type {}'.format(type(first_element)))
         else:
             raise ValueError('Sequence must be a list, received type {}'.format(type(sequence)))
@@ -267,18 +282,15 @@ class TransformSequence:
 
     @classmethod
     def build_from_metadata(cls, metadata: List[Dict]) -> List[TransformStepBase]:
-        sequence = []
+        sequence = TransformSequence()
         for entry in metadata:
-            step = TransformStep.load(metadata=entry)
+            step = TransformStepInterface.load(**entry)
             sequence.append(step)
         return sequence
 
-    def view_code(self):
+    def print_steps(self):
         for i, step in enumerate(self.sequence):
-            print("Step {}".format(i))
-            print("-"*80)
-            print(step.view_action())
-            print()
+            step.print_step(i)
 
 
 class SelfAwareData:
@@ -290,11 +302,18 @@ class SelfAwareData:
         self.transform_sequence = self._load_transform_seq_from_metadata(metadata)
 
     @classmethod
-    def load_from_path(cls, file_path: str) -> 'SelfAwareData':
-        # TODO: write test that this creates a FileSourceTransformationStep
+    def load_from_file(cls, file_path: str) -> 'SelfAwareData':
+        """
+        Create a SelfAwareData object with a initial FileSourceTransformStep
+        Args:
+            file_path: path to a standard file (not already a SelfAwareData)
+
+        Returns: SelfAwareData with a TransformSequence containing a FileSourceTransformStep pointing to file_path
+
+        """
         data_interface = DataInterfaceManager.select(file_path)
         data = data_interface.load(file_path)
-        return cls(data, {'file_path': file_path})
+        return cls(data, [{'file_path': file_path}])
 
     @staticmethod
     def _load_transform_seq_from_metadata(metadata: Union[List[Dict], TransformSequence]):
@@ -302,7 +321,7 @@ class SelfAwareData:
             return TransformSequence()
         elif type(metadata) == TransformSequence:
             return metadata
-        elif type(metadata) == List:
+        elif type(metadata) == list:
             return TransformSequence.build_from_metadata(metadata)
         else:
             raise ValueError('Metadata type {} is not valid, must be type List or TransformSequence'
@@ -327,9 +346,9 @@ class SelfAwareData:
 
         Returns: new transform directory name, for adding to contents dict.
         """
-        transformed_data, transform_step = TransformStep.execute(self.data, transformer_func, tag,
-                                                                 enforce_clean_git=enforce_clean_git,
-                                                                 get_git_hash_from=get_git_hash_from, **kwargs)
+        transformed_data, transform_step = TransformStepInterface.execute(self.data, transformer_func, tag,
+                                                                          enforce_clean_git=enforce_clean_git,
+                                                                          get_git_hash_from=get_git_hash_from, **kwargs)
         new_sad = self._copy_and_extend(transformed_data, transform_step)
         return new_sad
 
@@ -350,9 +369,9 @@ class SelfAwareData:
         """
         return self.transform_sequence.rerun(data)
 
-    def view_code(self):
+    def print_steps(self):
         """Print the code of the transformation steps that generated the data."""
-        self.transform_sequence.view_code()
+        self.transform_sequence.print_steps()
 
     def save(self, file_path: str,  **kwargs) -> Path:
         """
@@ -385,7 +404,7 @@ class SelfAwareData:
         return SelfAwareDataInterface.load(file_path, data_interface_hint, **kwargs)
 
 
-class SelfAwareDataInterfaceVersion:
+class VersionedSelfAwareDataInterface:
 
     version = None
     file_component_interfaces = {}
@@ -400,6 +419,10 @@ class SelfAwareDataInterfaceVersion:
 
     @classmethod
     def get_info(cls, path: str) -> Dict:
+        raise NotImplementedError
+
+    @classmethod
+    def get_printable_filename(cls, path: str) -> str:
         raise NotImplementedError
 
     @classmethod
@@ -444,7 +467,7 @@ class SelfAwareDataInterfaceVersion:
         return '{} {}:{}'.format(date, hours, minutes)
 
 
-class SelfAwareDataInterface_v0(SelfAwareDataInterfaceVersion):
+class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
     """DataInterface for saving and loading `SelfAwareData` objects."""
 
     version = 0
@@ -537,6 +560,14 @@ class SelfAwareDataInterface_v0(SelfAwareDataInterfaceVersion):
         }
 
     @classmethod
+    def get_printable_filename(cls, path) -> str:
+        """Build the filename that should be printed to describe the TransformedDataDirectory.
+         The filename is created based on the TransformedDataDirectory tag and file type."""
+        info = cls.get_info(path)
+        effective_filename = '{}.{}'.format(info['tag'], info['data_type'])
+        return effective_filename
+
+    @classmethod
     def get_data_type(cls, path: str) -> str:
         return cls.get_info(path)['data_type']
 
@@ -564,7 +595,7 @@ class SelfAwareDataInterface_v0(SelfAwareDataInterfaceVersion):
         return timestamp, git_hash, tag
 
 
-class SelfAwareDataInterface_v1(SelfAwareDataInterfaceVersion):
+class SelfAwareDataInterface_v1(VersionedSelfAwareDataInterface):
     """DataInterface for saving and loading `SelfAwareData` objects."""
 
     version = 1
@@ -639,16 +670,28 @@ class SelfAwareDataInterface_v1(SelfAwareDataInterfaceVersion):
 
     @classmethod
     def get_info(cls, path: str) -> Dict:
+        timestamp, tag = cls._parse_transform_dir_name(path)
         file_map = cls._identify_transform_sub_files(path)
         metadata_file = file_map['provenance']
         metadata = cls.file_component_interfaces['provenance'].load(metadata_file)
+        metadata['tag'] = tag
+        metadata['timestamp'] = timestamp
+        metadata['data_type'] = cls.get_data_type(path)
         return metadata
+
+    @classmethod
+    def get_printable_filename(cls, path) -> str:
+        """Build the filename that should be printed to describe the TransformedDataDirectory.
+         The filename is created based on the TransformedDataDirectory tag and file type."""
+        timestamp, tag = cls._parse_transform_dir_name(path)
+        effective_filename = '{}.{}'.format(tag, cls.get_data_type(path))
+        return effective_filename
 
     @classmethod
     def get_data_type(cls, path: str) -> str:
         file_map = cls._identify_transform_sub_files(path)
         data_file_root, data_file_type = os.path.splitext(file_map['data'])
-        return data_file_type
+        return data_file_type.replace('.', '')
 
     @classmethod
     def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
@@ -680,14 +723,14 @@ class SADInterfaceVersionManagerBase:
         self.version_map = {}
         self.latest_version = None
 
-    def register(self, interface: Type[SelfAwareDataInterfaceVersion]):
+    def register(self, interface: Type[VersionedSelfAwareDataInterface]):
         version = interface.version
         if version in self.version_map.keys():
             raise ValueError('There is already an interface registered as version {}'.format(version))
         self.version_map[version] = interface
         self._update_latest_version(version)
 
-    def select_version_for_path(self, file_path: str) -> SelfAwareDataInterfaceVersion:
+    def select_version_for_path(self, file_path: str) -> VersionedSelfAwareDataInterface:
         version = self.read_version_from_metadata_file(file_path)
         if version not in self.version_map:
             known_versions = list(self.version_map.keys())
@@ -701,7 +744,7 @@ class SADInterfaceVersionManagerBase:
         return self.version_map[version]
 
     @property
-    def latest(self) -> SelfAwareDataInterfaceVersion:
+    def latest(self) -> VersionedSelfAwareDataInterface:
         return self.version_map[self.latest_version]
 
     def _update_latest_version(self, version: int):
@@ -747,3 +790,13 @@ class SelfAwareDataInterface:
     def get_info(cls, path: str) -> Dict:
         versioned_interface = SADInterfaceVersionManager.select_version_for_path(path)
         return versioned_interface.get_info(path)
+
+    @classmethod
+    def get_printable_filename(cls, path) -> str:
+        versioned_interface = SADInterfaceVersionManager.select_version_for_path(path)
+        return versioned_interface.get_printable_filename(path)
+
+    @classmethod
+    def get_data_type(cls, path):
+        versioned_interface = SADInterfaceVersionManager.select_version_for_path(path)
+        return versioned_interface.get_data_type(path)

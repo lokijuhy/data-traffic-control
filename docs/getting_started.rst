@@ -156,7 +156,7 @@ When you apply a transform to your dataset, use the built-in `transform` method 
 By using the `SelfAwareData.transform` method, metadata about the transformation is automatically tracked.
 For example, you can:
 
-* view the code that transformed the ``SelfAwareData`` with ``SelfAwareData.view_code()``
+* view the code that transformed the ``SelfAwareData`` with ``SelfAwareData.print_steps()``
 * display the git hash of the transformer with ``SelfAwareData.git_hash``
 
 Save
@@ -226,7 +226,7 @@ To access the data:
 
 To view the code of the data's transformation function:
 
->>> sad.view_code()
+>>> sad.print_steps()
 
 To rerun the same transformation function on a new data object:
 

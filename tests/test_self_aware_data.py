@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 import shutil
 import tempfile
-from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface
+from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface, FileSourceTransformStep
 from datatc.data_interface import DataInterfaceManager
 
 
@@ -77,8 +77,8 @@ class TestSelfAwareData(unittest.TestCase):
         # assert the reloaded data is same as what was saved
         pd.testing.assert_frame_equal(reloaded_sad.data, my_sad.data)
 
-        # assert view_code runs without error
-        reloaded_sad.view_code()
+        # assert print_steps runs without error
+        reloaded_sad.print_steps()
 
         # assert rerun generates the same data if given the same input
         rerun_df = reloaded_sad.rerun(self.raw_df)
@@ -147,8 +147,15 @@ class TestSelfAwareData(unittest.TestCase):
 
         info = SelfAwareDataInterface.get_info(sad_file_path)
         self.assertEqual(type(info), dict)
-        expected_top_level_keys = {'interface_version', 'transform_steps'}
+        expected_top_level_keys = {'interface_version', 'timestamp', 'tag', 'data_type', 'transform_steps'}
         self.assertTrue(set(info.keys()) == expected_top_level_keys)
+        expected_top_level_info = {
+            'interface_version': 1,
+            'tag': 'new_sad',
+            'data_type': 'csv',
+        }
+        for key in expected_top_level_info:
+            self.assertEqual(info[key], expected_top_level_info[key])
 
         transform_info = info['transform_steps']
 
@@ -162,6 +169,14 @@ class TestSelfAwareData(unittest.TestCase):
         self.assertTrue(set(transform_step_0_info.keys()) == expected_transform_info_keys)
         for key in expected_info:
             self.assertEqual(transform_step_0_info[key], expected_info[key])
+
+    def test_load_SAD_from_file(self):
+        raw_data_path = Path(self.test_dir, 'raw_df.csv')
+        self.raw_df.to_csv(raw_data_path, index=False)
+        from_file_sad = SelfAwareData.load_from_file(raw_data_path)
+
+        self.assertEqual(len(from_file_sad.transform_sequence.sequence), 1)
+        self.assertTrue(type(from_file_sad.transform_sequence.sequence[0]), FileSourceTransformStep)
 
     def test_save_untransformed(self):
         raw_sad = SelfAwareData(self.raw_df)
@@ -181,22 +196,6 @@ class TestSelfAwareData(unittest.TestCase):
         contents_extensions = [f.suffix.replace('.', '') for f in sad_dir_contents]
         for ext in ['csv', 'dill', 'yaml']:
             self.assertTrue(ext in contents_extensions)
-
-    # @staticmethod
-    # def save_v0(data, code, parent_path):
-    #     transform_dir_name = 'transformed_data_dir__2020-05-11_09-56-05__bd9921a__normalized_df'
-    #     new_transform_dir_path = Path(parent_path, transform_dir_name)
-    #     os.makedirs(new_transform_dir_path)
-    #
-    #     data_interface = DataInterfaceManager.select('csv')
-    #     data_interface.save(data, 'data', new_transform_dir_path)
-    #
-    #     transformer_func = inspect.getsource(transformer_func)
-    #     func_interface = DataInterfaceManager.select('dill')
-    #     func_interface.save(transformer_func, 'func', new_transform_dir_path)
-    #
-    #     code_interface = DataInterfaceManager.select('dill')
-    #     code_interface.save(code, 'code', new_transform_dir_path)
 
     def test_load_interface_version_0(self):
         raw_sad = SelfAwareData(self.raw_df)
@@ -221,8 +220,8 @@ class TestSelfAwareData(unittest.TestCase):
         # assert the reloaded data is same as what was saved
         pd.testing.assert_frame_equal(reloaded_v0_sad.data, my_sad.data)
 
-        # assert view_code runs without error
-        reloaded_v0_sad.view_code()
+        # assert print_steps runs without error
+        reloaded_v0_sad.print_steps()
 
         # assert rerun generates the same data if given the same input
         rerun_df = reloaded_v0_sad.rerun(self.raw_df)

@@ -250,7 +250,7 @@ class SelfAwareDataDirectory(DataDirectory):
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
         printable_filename = SelfAwareDataInterface.get_printable_filename(self.path)
         info = SelfAwareDataInterface.get_info(self.path)
-        ls_description = '{}  ({})'.format(printable_filename, info['timestamp'])
+        ls_description = '{:20}  ({})'.format(printable_filename, info['timestamp'])
         return {ls_description: []}
 
 

@@ -10,6 +10,19 @@ from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextD
 from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_from_path
 
 
+class SADTimestamp:
+
+    @classmethod
+    def now(cls):
+        return datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+    @classmethod
+    def format(cls, timestamp):
+        date, time = timestamp.split('_')
+        hours, minutes, seconds = time.split('-')
+        return '{} {}:{}'.format(date, hours, minutes)
+
+
 class TransformStepBase:
 
     def __init__(self, **kwargs):
@@ -71,9 +84,14 @@ class LiveTransformStep(TransformStepBase):
         }
 
     def print_step(self, step_no) -> str:
+        print("-" * 80)
         print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
         print("-" * 80)
         print(self.code)
+        if self.kwargs is not None and len(self.kwargs) > 0:
+            print()
+            for kw in self.kwargs:
+                print(' - {}: {}'.format(kw, self.kwargs[kw]))
         print()
 
     def rerun(self, data: Any) -> Any:
@@ -125,9 +143,14 @@ class StaticTransformStep(TransformStepBase):
         }
 
     def print_step(self, step_no) -> str:
+        print("-" * 80)
         print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
         print("-" * 80)
         print(self.code)
+        if self.kwargs is not None and len(self.kwargs) > 0:
+            print()
+            for kw in self.kwargs:
+                print(' - {}: {}'.format(kw, self.kwargs[kw]))
         print()
 
 
@@ -150,6 +173,7 @@ class FileSourceTransformStep(TransformStepBase):
         }
 
     def print_step(self, step_no) -> str:
+        print("-" * 80)
         print("Step {:>2}".format(step_no))
         print("-" * 80)
         print('Source file: {}'.format(self.file_path))
@@ -164,7 +188,7 @@ class TransformStepInterface:
         code = inspect.getsource(transformer_func)
         git_hash = cls.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
         metadata = {
-            'timestamp': cls.generate_timestamp(),
+            'timestamp': SADTimestamp.format(SADTimestamp.now()),
             'code': code,
             'git_hash': git_hash,
             'kwargs': kwargs,
@@ -175,7 +199,8 @@ class TransformStepInterface:
         return data, LiveTransformStep(metadata, transformer_func)
 
     @classmethod
-    def load(cls, metadata: Dict = None, transform_func: Callable = None, file_path: str = None):
+    def load(cls, metadata: Dict = None, transform_func: Callable = None, file_path: str = None
+             ) -> Type[TransformStepBase]:
         """Factory method for generating different subclasses of TransformSteps"""
         if transform_func is not None:
             return cls.load_live(metadata, transform_func)
@@ -187,20 +212,16 @@ class TransformStepInterface:
             return cls.load_static(metadata)
 
     @staticmethod
-    def load_live(metadata: Dict, transform_func: Callable) -> 'LiveTransformStep':
+    def load_live(metadata: Dict, transform_func: Callable) -> LiveTransformStep:
         return LiveTransformStep(metadata, transform_func)
 
     @staticmethod
-    def load_static(metadata: Dict) -> 'StaticTransformStep':
+    def load_static(metadata: Dict) -> StaticTransformStep:
         return StaticTransformStep(metadata)
 
     @staticmethod
-    def from_file_path(file_path: str) -> 'FileSourceTransformStep':
+    def from_file_path(file_path: str) -> FileSourceTransformStep:
         return FileSourceTransformStep(file_path)
-
-    @classmethod
-    def generate_timestamp(cls):
-        return datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
     @staticmethod
     def get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git: bool = True) -> Union[str, None]:
@@ -456,16 +477,6 @@ class VersionedSelfAwareDataInterface:
         else:
             return options[0]
 
-    @classmethod
-    def generate_timestamp(cls):
-        return datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-
-    @classmethod
-    def _parse_timestamp_for_printing(cls, timestamp):
-        date, time = timestamp.split('_')
-        hours, minutes, seconds = time.split('-')
-        return '{} {}:{}'.format(date, hours, minutes)
-
 
 class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
     """DataInterface for saving and loading `SelfAwareData` objects."""
@@ -553,7 +564,7 @@ class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
         data_file_root, data_file_type = os.path.splitext(file_map['data'])
         data_file_type = data_file_type.replace('.', '')
         return {
-            'timestamp': cls._parse_timestamp_for_printing(timestamp),
+            'timestamp': SADTimestamp.format(timestamp),
             'git_hash': git_hash,
             'tag': tag,
             'data_type': data_file_type
@@ -573,7 +584,7 @@ class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
 
     @classmethod
     def _generate_name_for_transform_dir(cls, git_hash: str, tag: str = None) -> str:
-        timestamp = cls.generate_timestamp()
+        timestamp = SADTimestamp.now()
         delimiter_char = '__'
         file_name_components = ['sad_dir', timestamp, git_hash]
         if tag is not None:
@@ -675,7 +686,7 @@ class SelfAwareDataInterface_v1(VersionedSelfAwareDataInterface):
         metadata_file = file_map['provenance']
         metadata = cls.file_component_interfaces['provenance'].load(metadata_file)
         metadata['tag'] = tag
-        metadata['timestamp'] = timestamp
+        metadata['timestamp'] = SADTimestamp.format(timestamp)
         metadata['data_type'] = cls.get_data_type(path)
         return metadata
 
@@ -695,7 +706,7 @@ class SelfAwareDataInterface_v1(VersionedSelfAwareDataInterface):
 
     @classmethod
     def _generate_name_for_transform_dir(cls, tag: str = None) -> str:
-        timestamp = cls.generate_timestamp()
+        timestamp = SADTimestamp.now()
         delimiter_char = '__'
         file_name_components = ['sad_dir', timestamp]
         if tag is not None:

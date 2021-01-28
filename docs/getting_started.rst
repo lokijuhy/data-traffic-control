@@ -126,38 +126,99 @@ For example:
     dm['processed_data'].save(processed_df, 'processed.csv')
 
 
-
 ----
 
 
 Working with `SelfAwareData`
 --------------------------------------------
 
-`datatc` helps you remember how your datasets were generated.
+``SelfAwareData`` helps you remember how your datasets were generated.
 
-To track a dataset, first turn it into a `SelfAwareData` object.
+You have 2 options for turning your dataset into a ``SelfAwareData``:
 
-.. code-block:: python
+1. Load from a file:
 
-    from datatc import SelfAwareData
-    raw_sad = SelfAwareData(raw_df)
+>>> my_sad = SelfAwareData.load_from_file('~/path/to/data.csv')
 
-Your data is now accessible via ``raw_sad.data``.
+When you establish a ``SelfAwareData`` from a file, it will track the file that the ``SelfAwareData`` originated from.
+
+2. Create on the fly from a live data object:
+
+>>> my_sad = SelfAwareData(raw_df)
+
+Starting a ``SelfAwareData`` this way will not track how the data originated.
+
+Your data is now accessible via ``my_sad.data``.
 
 Transform
 '''''''''
 
 When you apply a transform to your dataset, use the built-in `transform` method to track the transform.
 
-.. code-block:: python
+>>> new_sad = my_sad.transform(transform_func)
 
-    new_sad = raw_sad.transform(transform_func)
+If you need to specify arguments to your ``transform_func``, do so as keyword arguments in the ``transform`` function:
 
-By using the `SelfAwareData.transform` method, metadata about the transformation is automatically tracked.
-For example, you can:
+>>> new_sad = my_sad.transform(transform_func, num_bins=12)
 
-* view the code that transformed the ``SelfAwareData`` with ``SelfAwareData.print_steps()``
-* display the git hash of the transformer with ``SelfAwareData.git_hash``
+.. note::
+    Note on Tracking Git Metadata: To ensure traceability, ``SelfAwareData`` checks that there are no uncommitted changes in the repo before running the transform.
+    If there are uncommitted changes, `datatc`` raises a ``RuntimeError``. If you would like to override this check, specify ``enforce_clean_git = False`` in ``transform()``.
+
+.. note::
+    If the ``transform_func`` you pass to ``transform()`` is written in a file in a git repo, then `datatc` will include the git hash of the repo where ``transform_func`` is written.
+    If the ``transform_func`` is not in a file (for example, is written on the fly in a notebook or in an interactive session),
+    the user may specify the module to get a git hash from via ``get_git_hash_from=module``.
+
+
+`SelfAwareData` objects automatically track their own metadata
+.................................................................
+
+By using the `SelfAwareData.transform` method, metadata about the transformation is automatically tracked, including:
+
+* the timestamp of when the transformation was run
+* the git hash of the repo where ``transform_func`` is located
+* the code of the transform used to transform the data
+* the arguments to the transform function
+
+To access metadata, you can print the transform steps:
+
+>>> new_sad.print_steps()
+--------------------------------------------------------------------------------
+Step  0               2021-01-27 21:46          no_git_hash
+--------------------------------------------------------------------------------
+def transform_step_1(input_df):
+    df = input_df.copy()
+    df['col_1'] = df['col_1'] * -1
+    return df
+--------------------------------------------------------------------------------
+Step  1               2021-01-27 21:46          no_git_hash
+--------------------------------------------------------------------------------
+def transform_step_2(input_df):
+    df = input_df.copy()
+    df['col_2'] = df['col_2']**2
+    return df
+
+To access the data programatically, use ``SelfAwareData.get_info()``:
+
+>>> new_sad.get_info()
+[
+    {
+        'timestamp': '2021-01-27_21-46-52',
+      'tag': '',
+      'code': "def transform_step_1(input_df):\n    df = input_df.copy()\n    df['col_1'] = df['col_1'] * -1\n    return df\n",
+      'kwargs': {},
+      'git_hash': 'no_git_hash'
+    },
+    {
+        'timestamp': '2021-01-27_21-46-55',
+        'tag': '',
+        'code': "def transform_step_2(input_df):\n    df = input_df.copy()\n    df['col_2'] = df['col_2']**2\n    return df\n",
+        'kwargs': {},
+        'git_hash': 'no_git_hash'
+    }
+]
+
 
 Save
 ''''
@@ -171,44 +232,6 @@ There are 2 ways to save ``SelfAwareData`` objects.
 2. You can also save ``SelfAwareData``, independently, without using ``DataManager``.
 
 >>> sad.save(output_file_path)
-
-
-`SelfAwareData` objects automatically track their own metadata
-.................................................................
-
-`datatc` also automatically tracks metadata about the data transformation, including:
-
-* the timestamp of when the transformation was run
-* the git hash of the repo where ``transform_func`` is located
-
-This metadata is visible when you ``ls`` a directory containing transformed data files:
-
->>> dm['feature_sets'].ls()
-feature_sets/
-    four_features.csv   (2020-04-24 17:40, 06ef971)
-    seven_features.csv  (2020-06-17 18:37, c61a1a6)
-    nine_features.csv   (2020-08-19 18:42, 25a173d)
-
-And you can access the metadata programmatically:
-
->>> dm['feature_sets'].latest().get_info()
-{
-    'timestamp': '2020-08-19 18:42',
-    'git_hash': '25a173d',
-    'tag': 'nine_features',
-    'data_type': 'csv'
-}
-
-
-Note on Tracking Git Metadata
-................................
-By default, when you save a transformed dataset via a ``transform_func``, `datatc` will include the git hash of the repo where ``transform_func`` is located.
-This workflow assumes that the ``transform_func``` is written in a file and imported into the active coding environment for use in creating a ``SelfAwareData`` object.
-If the ``transform_func`` is not in a file (for example, is written on the fly in a notebook or in an interactive session),
-the user may specify the module under development to get a git hash from via ``get_git_hash_from=module``.
-
-To ensure traceability, `datatc` checks that there are no uncommitted changes in the repo before proceeding with creating the `SelfAwareData`.
-If there are uncommitted changes, `datatc`` raises a ``RuntimeError``. If you would like to override this check, specify ``enforce_clean_git = False``.
 
 
 Load
@@ -235,11 +258,11 @@ To rerun the same transformation function on a new data object:
 Loading `SelfAwareData` objects without ``DataManager``
 .......................................................
 
-Just like with saving, you can also load ``SelfAwareData`` objects without going through ``DataManager``.
+You can also load ``SelfAwareData`` objects without going through ``DataManager``:
 
 >>> sad = SelfAwareData.load(file_path)
 
-However, ``SelfAwareData`` objects are saved to the file system as directories with long names, like ``sad_dir__2021-01-01_12-00__3002f4d__transform_1``.
+However, ``SelfAwareData`` objects are saved to the file system as directories with long names, like ``sad_dir__2021-01-01_12-00__transform_1``.
 When you interact with ``SelfAwareData`` via ``DataManager``, you can reference them like normal files (``transform_1.csv``), however, referencing them outside of ``DataMaanger`` is not as easy.
 
 Loading `SelfAwareData` objects in dependency-incomplete environments
@@ -259,18 +282,17 @@ Here's a toy example of working with ``SelfAwareData``:
 
 .. code-block:: python
 
-    from datatc import DataManager
-    from datatc import SelfAwareData
+    from datatc import DataManager, SelfAwareData
 
     dm = DataManager('datatc_demo')
 
-    raw_sad = dm['raw']['iris.csv'].load()
+    raw_sad = SelfAwareData.load_from_file(dm['raw']['iris.csv'].path)
 
     def petal_area(df):
         df['petal_area'] = df['petal_length'] * df['petal_width']
         return df
 
-    area_sad = raw_sad.transform(petal_area, 'petal_area')
+    area_sad = raw_sad.transform(petal_area, 'compute_petal_area')
 
     dm['processed'].save(area_sad, 'area.csv')
 

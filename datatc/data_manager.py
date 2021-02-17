@@ -1,3 +1,4 @@
+import warnings
 from datatc.data_directory import DataDirectory, DataDirectoryManager
 
 CONFIG_FILE_NAME = '.data_map.yaml'
@@ -20,7 +21,8 @@ class DataManager:
         """
         self.data_path = DataDirectoryManager.load_project_path_from_hint(path_hint)
         self.data_directory = DataDirectory(self.data_path.__str__())
-        raise DeprecationWarning('DataManager is deprecated. Please use `DataDirectory.load()` instead.')
+        warnings.warn('DataManager is deprecated. Please use `DataDirectory.load()` instead.', DeprecationWarning,
+                      stacklevel=2)
 
     def reload(self):
         """Refresh the data directory contents that `DataManager` is aware of.

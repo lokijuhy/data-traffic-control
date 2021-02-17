@@ -31,7 +31,10 @@ class TransformStepBase:
     def get_info(self) -> Dict:
         raise NotImplementedError
 
-    def print_step(self, step_no) -> str:
+    def print_step(self, step_no) -> None:
+        raise NotImplementedError
+
+    def rerun(self, data: Any):
         raise NotImplementedError
 
 
@@ -83,7 +86,7 @@ class LiveTransformStep(TransformStepBase):
             'git_hash': self.git_hash,
         }
 
-    def print_step(self, step_no) -> str:
+    def print_step(self, step_no) -> None:
         print("-" * 80)
         print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
         print("-" * 80)
@@ -142,7 +145,7 @@ class StaticTransformStep(TransformStepBase):
             'git_hash': self.git_hash,
         }
 
-    def print_step(self, step_no) -> str:
+    def print_step(self, step_no) -> None:
         print("-" * 80)
         print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
         print("-" * 80)
@@ -152,6 +155,9 @@ class StaticTransformStep(TransformStepBase):
             for kw in self.kwargs:
                 print(' - {}: {}'.format(kw, self.kwargs[kw]))
         print()
+
+    def rerun(self, data: Any):
+        raise RuntimeError('rerun is not available for StaticTransformSteps')
 
 
 class FileSourceTransformStep(TransformStepBase):
@@ -172,19 +178,22 @@ class FileSourceTransformStep(TransformStepBase):
             'file_path': str(self.file_path),
         }
 
-    def print_step(self, step_no) -> str:
+    def print_step(self, step_no) -> None:
         print("-" * 80)
         print("Step {:>2}".format(step_no))
         print("-" * 80)
         print('Source file: {}'.format(self.file_path))
         print()
 
+    def rerun(self, data: Any):
+        raise RuntimeError('rerun is not available for FileSourceTransformSteps')
+
 
 class TransformStepInterface:
 
     @classmethod
     def execute(cls, data: Any, transformer_func: Callable, tag: str = '', enforce_clean_git: bool = True,
-                get_git_hash_from: Any = None, **kwargs) -> Union[Any, Type[TransformStepBase]]:
+                get_git_hash_from: Any = None, **kwargs) -> Union[Any, TransformStepBase]:
         code = inspect.getsource(transformer_func)
         git_hash = cls.get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git)
         metadata = {
@@ -200,7 +209,7 @@ class TransformStepInterface:
 
     @classmethod
     def load(cls, metadata: Dict = None, transform_func: Callable = None, file_path: str = None
-             ) -> Type[TransformStepBase]:
+             ) -> TransformStepBase:
         """Factory method for generating different subclasses of TransformSteps"""
         if transform_func is not None:
             return cls.load_live(metadata, transform_func)
@@ -236,7 +245,7 @@ class TransformStepInterface:
 
         Returns: string of the git hash if the transformer_func is in a repo, otherwise None.
 
-        Raises: RuntimeError if there are uncommitted changes in the transformer_func's repo. Can be overrridden by
+        Raises: RuntimeError if there are uncommitted changes in the transformer_func's repo. Can be overridden by
             `enforce_clean_git = False`.
         """
         if get_git_hash_from:
@@ -258,10 +267,15 @@ class TransformStepInterface:
             return 'no_git_hash'
 
 
+TransformSequenceConvertible = Union['TransformSequence', List[TransformStepBase], List[Dict]]
+
+
 class TransformSequence:
 
-    def __init__(self, sequence: Union[List[Type[TransformStepBase]], List[Dict]] = None):
-        if sequence is None:
+    def __init__(self, sequence: TransformSequenceConvertible = None):
+        if type(sequence) == TransformSequence:
+            self.sequence = sequence.sequence
+        elif sequence is None:
             self.sequence = []
         elif type(sequence) is list:
             if len(sequence) == 0:
@@ -278,7 +292,7 @@ class TransformSequence:
         else:
             raise ValueError('Sequence must be a list, received type {}'.format(type(sequence)))
 
-    def append(self, transform_step: Type[TransformStepBase]):
+    def append(self, transform_step: TransformStepBase):
         self.sequence.append(transform_step)
 
     def rerun(self, data: Any) -> Any:
@@ -292,7 +306,7 @@ class TransformSequence:
                 transformed_data = step.rerun(transformed_data)
         return transformed_data
 
-    def is_not_empty(self):
+    def is_not_empty(self) -> bool:
         return len(self.sequence) > 0
 
     def get_info(self):
@@ -303,7 +317,7 @@ class TransformSequence:
 
     @classmethod
     def build_from_metadata(cls, metadata: List[Dict]) -> List[TransformStepBase]:
-        sequence = TransformSequence()
+        sequence = []
         for entry in metadata:
             step = TransformStepInterface.load(**entry)
             sequence.append(step)
@@ -318,14 +332,15 @@ class SelfAwareData:
     """A wrapper around a dataset that also contains the code that generated the data.
      `SelfAwareData` can re-run it's transformation steps on a new dataset."""
 
-    def __init__(self, data: Any, metadata: Union[Dict, TransformSequence] = None):
+    def __init__(self, data: Any, metadata: TransformSequenceConvertible = None):
         self.data = data
-        self.transform_sequence = self._load_transform_seq_from_metadata(metadata)
+        self.transform_sequence = TransformSequence(metadata)
 
     @classmethod
     def load_from_file(cls, file_path: str) -> 'SelfAwareData':
         """
         Create a SelfAwareData object with a initial FileSourceTransformStep
+
         Args:
             file_path: path to a standard file (not already a SelfAwareData)
 
@@ -334,24 +349,12 @@ class SelfAwareData:
         """
         data_interface = DataInterfaceManager.select(file_path)
         data = data_interface.load(file_path)
-        return cls(data, [{'file_path': file_path}])
-
-    @staticmethod
-    def _load_transform_seq_from_metadata(metadata: Union[List[Dict], TransformSequence]):
-        if metadata is None:
-            return TransformSequence()
-        elif type(metadata) == TransformSequence:
-            return metadata
-        elif type(metadata) == list:
-            return TransformSequence.build_from_metadata(metadata)
-        else:
-            raise ValueError('Metadata type {} is not valid, must be type List or TransformSequence'
-                             ''.format(type(metadata)))
+        metadata = [{'file_path': file_path}]
+        return cls(data, metadata)
 
     def get_info(self) -> List[Dict]:
         return self.transform_sequence.get_info()
 
-    # TODO: add transform_merge method for combining?
     def transform(self, transformer_func: Callable, tag: str = '', enforce_clean_git=True,
                   get_git_hash_from: Any = None, **kwargs) -> 'SelfAwareData':
         """
@@ -382,6 +385,7 @@ class SelfAwareData:
     def rerun(self, data) -> Any:
         """
         Rerun the same transformation function that generated this `SelfAwareData` on a new data object.
+
         Args:
             data:
 
@@ -402,10 +406,6 @@ class SelfAwareData:
             file_path: Path for where to save the SAD, including file extension.
 
         Returns: Path to the saved SAD
-
-        Example Usage:
-            >>> processed_sad = raw_sad.transform(build_features, 'standard_features')
-            >>> processed_sad.save('~/project/data/standard_features.csv')
         """
         dir_path = os.path.dirname(file_path)
         file_name = os.path.basename(file_path)
@@ -418,6 +418,7 @@ class SelfAwareData:
 
         Args:
             file_path: Path to the SAD to load.
+            data_interface_hint: Hint for which kind of data interface to use to load the data (file extension).
 
         Example Usage:
             >>> sad = SelfAwareData.load('~/project/data/sad_dir__2021-01-01_12-00__standard_features.csv')
@@ -506,8 +507,12 @@ class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
         info = sad.get_info()
         if len(info) > 0:
             git_hash = info[-1].get('git_hash', '')
-            transformer_func = sad.transform_sequence.sequence[-1].transformer_func
             code = info[-1].get('code', '')
+            latest_transform_step = sad.transform_sequence.sequence[-1]
+            if type(latest_transform_step) == LiveTransformStep:
+                transformer_func = latest_transform_step.transformer_func
+            else:
+                transformer_func = None
         else:
             git_hash = ''
             transformer_func = None

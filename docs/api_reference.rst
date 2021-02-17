@@ -28,6 +28,6 @@ DataFile
 SelfAwareData
 ---------------
 
-.. autoclass:: datatc.data_transformer.SelfAwareData
+.. autoclass:: datatc.self_aware_data.SelfAwareData
     :members:
 

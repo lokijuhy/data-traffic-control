@@ -24,7 +24,7 @@ class DataDirectory:
             data_interface_manager: DataInterfaceManager object to use to interface with files.
         """
         # TODO: check path
-        self.path = path
+        self.path = Path(path).resolve()
         self.name = os.path.basename(self.path)
         if contents is None:
             self.contents = self._characterize_dir(self.path)
@@ -226,10 +226,10 @@ class SelfAwareDataDirectory(DataDirectory):
         super().__init__(path, contents)
 
         # Overwrite the name (normally os.path.basename) with effective file name
-        self.name = self._get_printable_filename()
+        self.name = SelfAwareDataInterface.get_printable_filename(self.path)
 
     def _determine_data_type(self):
-        return SelfAwareDataInterface.get_info(self.path)['data_type']
+        return SelfAwareDataInterface.get_data_type(self.path)
 
     def load(self, data_interface_hint: str = None, load_function: bool = True, **kwargs) -> 'SelfAwareData':
         """
@@ -248,17 +248,10 @@ class SelfAwareDataDirectory(DataDirectory):
         return SelfAwareDataInterface.get_info(self.path)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:
-        printable_filename = self._get_printable_filename()
+        printable_filename = SelfAwareDataInterface.get_printable_filename(self.path)
         info = SelfAwareDataInterface.get_info(self.path)
-        ls_description = '{}  ({}, {})'.format(printable_filename, info['timestamp'], info['git_hash'])
+        ls_description = '{:20}  ({})'.format(printable_filename, info['timestamp'])
         return {ls_description: []}
-
-    def _get_printable_filename(self) -> str:
-        """Build the filename that should be printed to describe the TransformedDataDirectory.
-         The filename is created based on the TransformedDataDirectory tag and file type."""
-        info = SelfAwareDataInterface.get_info(self.path)
-        effective_filename = '{}.{}'.format(info['tag'], info['data_type'])
-        return effective_filename
 
 
 class DataFile(DataDirectory):

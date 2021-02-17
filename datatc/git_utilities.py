@@ -41,7 +41,7 @@ def check_if_path_is_in_git_repo(path: str) -> bool:
     return True
 
 
-def get_git_hash(dir_path: str) -> str:
+def get_git_hash_from_path(dir_path: str) -> str:
     """
     Get the short hash of latest git commit.
         path (str): Path to directory within a git repo. Does not need to be the top level repo directory.

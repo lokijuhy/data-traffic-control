@@ -1,5 +1,5 @@
 import pandas as pd
-from pathlib import Path
+from pathlib import Path, PosixPath
 import pickle
 import dill
 import os
@@ -202,6 +202,8 @@ class DataInterfaceManagerBase:
 
     @staticmethod
     def parse_file_hint(file_hint: str) -> str:
+        if type(file_hint) is PosixPath:
+            file_hint = file_hint.__str__()
         if '.' in file_hint:
             file_name, file_extension = file_hint.split('.')
             return file_extension

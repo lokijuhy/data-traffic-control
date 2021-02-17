@@ -34,14 +34,15 @@ class TestIntegration(unittest.TestCase):
         pd.testing.assert_frame_equal(test_csv, self.raw_df)
 
         # TEST SELECT
-        test_csv_path = dd.select('test').path
+        # I have no idea where the `/private` prefix comes from - Path.resolve??
+        test_csv_path = str(dd.select('test').path).replace('/private', '')
         self.assertEqual(test_csv_path, Path(self.test_dir, 'test.csv').__str__())
 
-        test_csv_path = dd.select('csv').path
+        test_csv_path = str(dd.select('csv').path).replace('/private', '')
         self.assertEqual(test_csv_path, Path(self.test_dir, 'test.csv').__str__())
 
         # TEST LATEST
-        test_csv_path = dd.latest().path
+        test_csv_path = str(dd.latest().path).replace('/private', '')
         self.assertEqual(test_csv_path, Path(self.test_dir, 'test.csv').__str__())
 
         # TEST SAVE

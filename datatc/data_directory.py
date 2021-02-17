@@ -244,7 +244,7 @@ class SelfAwareDataDirectory(DataDirectory):
         return SelfAwareDataInterface.load(self.path, data_interface_hint, load_function, **kwargs)
 
     def get_info(self) -> Dict[str, str]:
-        """Get sequence about the `SelfAwareData` object."""
+        """Get metadata about the `SelfAwareData` object."""
         return SelfAwareDataInterface.get_info(self.path)
 
     def _build_ls_tree(self, full: bool = False, top_dir: bool = True) -> Dict[str, List]:

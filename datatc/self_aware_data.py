@@ -460,7 +460,7 @@ class VersionedSelfAwareDataInterface:
         raise NotImplementedError
 
     @classmethod
-    def _identify_transform_sub_files(cls, path: str) -> Dict[str, Path]:
+    def _identify_transform_sub_files(cls, path: str) -> Dict[str, str]:
         glob_path = Path(path, '*')
         subpaths = glob.glob(glob_path.__str__())
         file_map = {}
@@ -469,8 +469,8 @@ class VersionedSelfAwareDataInterface:
         return file_map
 
     @classmethod
-    def _identify_sub_file(cls, file_contents: List[Path], key: str) -> Path:
-        options = [file_path for file_path in file_contents if key in os.path.basename(file_path)]
+    def _identify_sub_file(cls, file_contents: List[Path], key: str) -> str:
+        options = [str(file_path) for file_path in file_contents if key in os.path.basename(file_path)]
         if len(options) == 0:
             raise ValueError('No {} file found for SelfAwareData'.format(key))
         elif len(options) > 1:

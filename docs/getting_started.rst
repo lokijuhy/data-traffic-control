@@ -4,9 +4,9 @@ Getting Started
 
 Register a project
 -------------------------------------
-``datatc`` will remember for you where the data for each of your projects is stored, so that you don't have to.
-The first time you use ``datatc`` with a project, register it with :class:`datatc.data_manager.DataDirectory`.
-You only have to do this once- ``datatc`` saves the information in ``~/.data_map.yaml``
+`datatc` will remember for you where the data for each of your projects is stored, so that you don't have to.
+The first time you use `datatc` with a project, register it with ``DataDirectory``.
+You only have to do this once- `datatc` saves the information in ``~/.data_map.yaml``
 so you never have to memorize that long file path again.
 
 >>> DataDirectory.register_project('project_name', '/path/to/project/data/dir/')
@@ -71,7 +71,7 @@ To load a file, navigate the file system using ``[]`` operators, and then call `
 >>> raw_df = dd['data_extracts']['2020-02-04_Extract_3months']['2020-02-04_Extract_3months.xlsx'].load()
 
 
-Don't worry about what format the file is in- ``datatc`` will intuit how to load the file.
+Don't worry about what format the file is in- `datatc` will intuit how to load the file. See :ref:`supported_formats`.
 
 
 Shortcuts for loading data files *faster*
@@ -106,8 +106,8 @@ For example, if your csv file is actually pipe separated and has a non-default e
 
 ... my file type isn't recognized by `datatc`
 ................................................
-If ``datatc`` doesn't recognize the file type, you can give it a type hint of which loader to use.
-For example, ``datatc`` doesn't have a specific interface for reading tab separated files,
+If `datatc` doesn't recognize the file type, you can give it a type hint of which loader to use.
+For example, `datatc` doesn't have a specific interface for reading tab separated files,
 but if you tell it to treat it as a csv and instruct it to use tab as the separator, it will load it right up:
 
 >>> raw_df = dd['queries']['batch_query.tsv'].load(data_interface_hint='csv', sep='\t')
@@ -171,7 +171,7 @@ If you need to specify arguments to your ``transform_func``, do so as keyword ar
 
 .. note::
     Note on Tracking Git Metadata: To ensure traceability, ``SelfAwareData`` checks that there are no uncommitted changes in the repo before running the transform.
-    If there are uncommitted changes, `datatc`` raises a ``RuntimeError``. If you would like to override this check, specify ``enforce_clean_git = False`` in ``transform()``.
+    If there are uncommitted changes, `datatc` raises a ``RuntimeError``. If you would like to override this check, specify ``enforce_clean_git = False`` in ``transform()``.
 
 .. note::
     If the ``transform_func`` you pass to ``transform()`` is written in a file in a git repo, then `datatc` will include the git hash of the repo where ``transform_func`` is written.
@@ -182,7 +182,7 @@ If you need to specify arguments to your ``transform_func``, do so as keyword ar
 `SelfAwareData` objects automatically track their own metadata
 .................................................................
 
-By using the `SelfAwareData.transform` method, metadata about the transformation is automatically tracked, including:
+By using the ``SelfAwareData.transform`` method, metadata about the transformation is automatically tracked, including:
 
 * the timestamp of when the transformation was run
 * the git hash of the repo where ``transform_func`` is located
@@ -193,14 +193,14 @@ To access metadata, you can print the transform steps:
 
 >>> new_sad.print_steps()
 --------------------------------------------------------------------------------
-Step  0               2021-01-27 21:46          no_git_hash
+Step  0               2021-01-27 21:46          f98fc21
 --------------------------------------------------------------------------------
 def transform_step_1(input_df):
     df = input_df.copy()
     df['col_1'] = df['col_1'] * -1
     return df
 --------------------------------------------------------------------------------
-Step  1               2021-01-27 21:46          no_git_hash
+Step  1               2021-01-27 21:46          f98fc21
 --------------------------------------------------------------------------------
 def transform_step_2(input_df):
     df = input_df.copy()
@@ -216,14 +216,14 @@ To access the data programatically, use ``SelfAwareData.get_info()``:
       'tag': '',
       'code': "def transform_step_1(input_df):\n    df = input_df.copy()\n    df['col_1'] = df['col_1'] * -1\n    return df\n",
       'kwargs': {},
-      'git_hash': 'no_git_hash'
+      'git_hash': 'f98fc21'
     },
     {
         'timestamp': '2021-01-27_21-46-55',
         'tag': '',
         'code': "def transform_step_2(input_df):\n    df = input_df.copy()\n    df['col_2'] = df['col_2']**2\n    return df\n",
         'kwargs': {},
-        'git_hash': 'no_git_hash'
+        'git_hash': 'f98fc21'
     }
 ]
 
@@ -283,7 +283,7 @@ use
 
 to avoid a ``ModuleNotFoundError``.
 
-``SelfAwareData`` Example
+`SelfAwareData` Example
 '''''''''''''''''''''''''
 
 Here's a toy example of working with ``SelfAwareData``:
@@ -300,7 +300,7 @@ Here's a toy example of working with ``SelfAwareData``:
         df['petal_area'] = df['petal_length'] * df['petal_width']
         return df
 
-    area_sad = raw_sad.transform(petal_area, 'compute_petal_area')
+    area_sad = raw_sad.transform(petal_area)
 
     dd['processed'].save(area_sad, 'area.csv')
 

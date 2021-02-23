@@ -1,5 +1,6 @@
 import warnings
 from datatc.data_directory import DataDirectory, DataDirectoryManager
+from typing import Type
 
 CONFIG_FILE_NAME = '.data_map.yaml'
 
@@ -10,16 +11,18 @@ class DataManager:
 
     """
 
-    def __init__(self, path_hint: str):
+    data_dir_manager = DataDirectoryManager
+
+    def __init__(self, path_hint: str, data_dir_manager: Type[DataDirectoryManager] = DataDirectoryManager):
         """
         Initialize a DataManager pointing at a project's data_path.
 
         Args:
             path_hint: the name of a project that has been previously registered to `DataManager`, or a path to a data
                 directory.
-
+            data_dir_manager: DataDirectoryManager to use to interact with registered DataDirectories
         """
-        self.data_path = DataDirectoryManager.load_project_path_from_hint(path_hint)
+        self.data_path = data_dir_manager.load_project_path_from_hint(path_hint)
         self.data_directory = DataDirectory(self.data_path.__str__())
         warnings.warn('DataManager is deprecated. Please use `DataDirectory.load()` instead.', DeprecationWarning,
                       stacklevel=2)
@@ -34,12 +37,13 @@ class DataManager:
         return self.data_directory[key]
 
     @classmethod
-    def register_project(cls, project_hint: str, project_path: str) -> None:
-        return DataDirectoryManager.register_project(project_hint, project_path)
+    def register_project(cls, project_hint: str, project_path: str,
+                         data_dir_manager: Type[DataDirectoryManager] = DataDirectoryManager) -> None:
+        return data_dir_manager.register_project(project_hint, project_path)
 
     @classmethod
-    def list_projects(cls) -> None:
-        return DataDirectoryManager.list_projects()
+    def list_projects(cls, data_dir_manager: Type[DataDirectoryManager] = DataDirectoryManager) -> None:
+        return data_dir_manager.list_projects()
 
     def ls(self, full: bool = False) -> None:
         """

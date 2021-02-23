@@ -1,8 +1,12 @@
 import unittest
+import warnings
+import pytest
 from datatc.data_directory import DataDirectory, DataFile
 from datatc.data_interface import TestDataInterfaceManager
 
 
+# suppress 'DataDirectory path does not exist' warnings
+@pytest.mark.filterwarnings('ignore')
 class TestDataDirectory(unittest.TestCase):
 
     # === LS ===

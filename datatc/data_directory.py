@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import yaml
 from typing import Any, Dict, List, Union
+import warnings
 
 from datatc.data_interface import DataInterfaceManager
 from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface
@@ -163,11 +164,29 @@ class DataDirectoryManager:
             yaml.dump(config_entry_data, f, default_flow_style=False)
 
 
+class TestingDataDirectoryManager(DataDirectoryManager):
+    """DataDirectoryManager useful for testing purposes, as it does not interact with the file system."""
+
+    @classmethod
+    def _config_exists(cls):
+        return True
+
+    @classmethod
+    def _load_config(cls) -> Dict:
+        return {'test': '.'}
+
+    @staticmethod
+    def _register_project_to_file(project_hint: str, project_path: Path, config_file_path: Path):
+        return
+
+
 class DataDirectory:
     """Manages saving, loading, and viewing data files within a specific data path."""
 
+    data_dir_manager = DataDirectoryManager
+
     def __init__(self, path: str, contents: Dict[str, 'DataDirectory'] = None,
-                 data_interface_manager=DataInterfaceManager, validate_path: bool = True):
+                 data_interface_manager=DataInterfaceManager):
         """
         Initialize a DataDirectory at a path. The contents of that DataDirectory are recursively characterized and the
         DataDirectory's data_type set. For testing purposes, the contents can also be set directly.
@@ -178,6 +197,8 @@ class DataDirectory:
             data_interface_manager: DataInterfaceManager object to use to interface with files.
         """
         self.path = Path(path).expanduser().resolve()
+        if not self.path.exists():
+            warnings.warn('DataDirectory path does not exist: {}'.format(self.path), RuntimeWarning)
         self.name = os.path.basename(self.path)
         if contents is None:
             self.contents = self._characterize_dir(self.path)
@@ -190,17 +211,17 @@ class DataDirectory:
     @classmethod
     def register_project(cls, project_hint: str, project_path: str) -> None:
         """Register a hint for a project data directory so that it can be easily reloaded via `load(hint)`."""
-        return DataDirectoryManager.register_project(project_hint, project_path)
+        return cls.data_dir_manager.register_project(project_hint, project_path)
 
     @classmethod
     def list_projects(cls) -> None:
         """List all data directories previously registered via `register_project`."""
-        return DataDirectoryManager.list_projects()
+        return cls.data_dir_manager.list_projects()
 
     @classmethod
     def load_project(cls, hint):
         """Create a DataDirectory from a project hint previously registered via `register_project`."""
-        path = DataDirectoryManager.load_project_path_from_hint(hint)
+        path = cls.data_dir_manager.load_project_path_from_hint(hint)
         return cls(path)
 
     @classmethod

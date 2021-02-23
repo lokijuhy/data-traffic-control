@@ -88,7 +88,7 @@ class LiveTransformStep(TransformStepBase):
 
     def print_step(self, step_no) -> None:
         print("-" * 80)
-        print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
+        print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, '#'+self.git_hash))
         print("-" * 80)
         print(self.code)
         if self.kwargs is not None and len(self.kwargs) > 0:
@@ -147,7 +147,7 @@ class StaticTransformStep(TransformStepBase):
 
     def print_step(self, step_no) -> None:
         print("-" * 80)
-        print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, self.git_hash))
+        print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, '#'+self.git_hash))
         print("-" * 80)
         print(self.code)
         if self.kwargs is not None and len(self.kwargs) > 0:

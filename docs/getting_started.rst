@@ -71,7 +71,7 @@ To load a file, navigate the file system using ``[]`` operators, and then call `
 >>> raw_df = dd['data_extracts']['2020-02-04_Extract_3months']['2020-02-04_Extract_3months.xlsx'].load()
 
 
-Don't worry about what format the file is in- `datatc` will intuit how to load the file. See :ref:`supported_formats`.
+Don't worry about what format the file is in- `datatc` will intuit how to load the file. See `Supported Formats`.
 
 
 Shortcuts for loading data files *faster*
@@ -307,15 +307,31 @@ Here's a toy example of working with ``SelfAwareData``:
 ----
 
 
-Working with File Types via `DataInterface`
+Working with File Types via `MagicDataInterface`
 ------------------------------------------------
 
-`DataInterface` provides a standard interface for interacting with all file types: ``save()`` and ``load()``. This abstracts away the exact saving and loading operations for specific file types.
+``MagicDataInterface`` provides a one-stop shop for interacting with common file types.
+Just point ``MagicDataInterface`` to a file path and call ``save()`` and ``load()``.
 
-If you want to work with a file type that `datatc` doesn't know about yet, you can create a `DataInterface` for it:
+.. code-block:: python
+
+    from datatc import MagicDataInterface
+
+    iris_df = MagicDataInterface.load('iris.csv')
+    config = MagicDataInterface.load('config/model_params.yaml')
+
+    MagicDataInterface.save(results, 'results/iris_results.pkl')
+
+See `Supported Formats` for a list of data types that ``MagicDataInterface`` knows how to work with.
+
+
+Add a Data Type to MagicDataInterface
+.....................................
+
+If you want to work with a file type that ``MagicDataInterface`` doesn't know about yet, you can create a `DataInterface` for it:
 
  1. Create a ``DataInterface`` that subclasses from ``DataInterfaceBase``, and implement the ``_interface_specific_save`` and ``_interface_specific_load`` functions.
 
- 2. Register your new `DataInterface` with `DataInterfaceManager`:
+ 2. Register your new `DataInterface` with ``MagicDataInterface``:
 
-    >>> DataInterfaceManager.register_data_interface(MyNewDataInterface)
+    >>> MagicDataInterface.register_data_interface(MyNewDataInterface)

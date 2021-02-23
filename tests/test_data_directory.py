@@ -2,7 +2,7 @@ import unittest
 import warnings
 import pytest
 from datatc.data_directory import DataDirectory, DataFile
-from datatc.data_interface import TestDataInterfaceManager
+from datatc.data_interface import TestMagicDataInterface
 
 
 # suppress 'DataDirectory path does not exist' warnings
@@ -136,7 +136,7 @@ class TestDataDirectory(unittest.TestCase):
         expected_directory_contents_after_save = {file_name: DataFile(expected_file_path)}
 
         data_directory = DataDirectory(path='$HOME', contents=initial_directory_contents,
-                                       data_interface_manager=TestDataInterfaceManager)
+                                       magic_data_interface=TestMagicDataInterface)
         data_directory.save(42, file_name)
 
         # check that the contents keys (the file names) are the same

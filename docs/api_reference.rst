@@ -25,3 +25,9 @@ SelfAwareData
 .. autoclass:: datatc.self_aware_data.SelfAwareData
     :members:
 
+
+MagicDataInterface
+---------------
+
+.. autoclass:: datatc.data_interface.MagicDataInterface
+    :members:

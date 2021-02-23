@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
-from datatc.data_interface import DataInterfaceManager, DillDataInterface, TextDataInterface, YAMLDataInterface
+from datatc.data_interface import MagicDataInterface, DillDataInterface, TextDataInterface, YAMLDataInterface
 from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_from_path
 
 
@@ -347,8 +347,7 @@ class SelfAwareData:
         Returns: SelfAwareData with a TransformSequence containing a FileSourceTransformStep pointing to file_path
 
         """
-        data_interface = DataInterfaceManager.select(file_path)
-        data = data_interface.load(file_path)
+        data = MagicDataInterface.load(file_path)
         metadata = [{'file_path': file_path}]
         return cls(data, metadata)
 
@@ -521,7 +520,7 @@ class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
-        data_interface = DataInterfaceManager.select(data_file_type)
+        data_interface = MagicDataInterface.select_data_interface(data_file_type)
         data_interface.save(sad.data, 'data', new_transform_dir_path, **kwargs)
         cls.file_component_interfaces['func'].save(transformer_func, 'func', new_transform_dir_path)
         cls.file_component_interfaces['code'].save(code, 'code', new_transform_dir_path)
@@ -548,8 +547,7 @@ class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
         func_file = file_map['func']
         code_file = file_map['code']
 
-        data_interface = DataInterfaceManager.select(data_file, default_file_type=data_interface_hint)
-        data = data_interface.load(data_file, **kwargs)
+        data = MagicDataInterface.load(data_file, data_interface_hint=data_interface_hint, **kwargs)
         if load_function:
             transformer_func = cls.file_component_interfaces['func'].load(func_file)
         else:
@@ -640,7 +638,7 @@ class SelfAwareDataInterface_v1(VersionedSelfAwareDataInterface):
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
-        data_interface = DataInterfaceManager.select(data_file_type)
+        data_interface = MagicDataInterface.select_data_interface(data_file_type)
         data_interface.save(sad.data, 'data', new_transform_dir_path, **kwargs)
 
         cls.file_component_interfaces['sad'].save(sad, 'sad', new_transform_dir_path)
@@ -677,7 +675,7 @@ class SelfAwareDataInterface_v1(VersionedSelfAwareDataInterface):
             sad = cls.file_component_interfaces['sad'].load(sad_file)
             return sad
         else:
-            data_interface = DataInterfaceManager.select(data_file, default_file_type=data_interface_hint)
+            data_interface = MagicDataInterface.select_data_interface(data_file, default_file_type=data_interface_hint)
             data = data_interface.load(data_file, **kwargs)
             metadata = cls.file_component_interfaces['provenance'].load(metadata_file)
             # TODO: make function to add and extract version from sequence file

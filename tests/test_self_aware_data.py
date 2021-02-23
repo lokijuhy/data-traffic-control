@@ -5,7 +5,6 @@ from pathlib import Path
 import shutil
 import tempfile
 from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface, FileSourceTransformStep
-from datatc.data_interface import DataInterfaceManager
 
 
 class TestSelfAwareData(unittest.TestCase):

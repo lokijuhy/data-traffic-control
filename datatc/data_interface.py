@@ -185,32 +185,30 @@ class TestingDataInterface(DataInterfaceBase):
         return {'data': 42}
 
 
-class DataInterfaceManagerBase:
+class MagicDataInterfaceBase:
 
     def __init__(self):
         self.registered_interfaces = {}
 
+    def save(self, data: Any, file_path: str, mode: str = None, **kwargs) -> str:
+        file_dir_path = os.path.dirname(file_path)
+        file_name = os.path.basename(file_path)
+        data_interface = self.select_data_interface(file_name)
+        saved_file_path = data_interface.save(data, file_name, file_dir_path, mode=mode, **kwargs)
+        return saved_file_path
+
+    def load(self, file_path: str, data_interface_hint: str = None, **kwargs) -> Any:
+        if data_interface_hint is None:
+            data_interface = self.select_data_interface(file_path)
+        else:
+            data_interface = self.select_data_interface(data_interface_hint)
+        print('Loading {}'.format(file_path))
+        return data_interface.load(file_path, **kwargs)
+
     def register_data_interface(self, data_interface: Type[DataInterfaceBase]) -> None:
         self.registered_interfaces[data_interface.file_extension] = data_interface
 
-    def instantiate_data_interface(self, file_type: str) -> DataInterfaceBase:
-        if file_type in self.registered_interfaces:
-            return self.registered_interfaces[file_type]()
-        else:
-            raise ValueError("File type {} not recognized. Supported file types include {}".format(
-                file_type, list(self.registered_interfaces.keys())))
-
-    @staticmethod
-    def parse_file_hint(file_hint: str) -> str:
-        if type(file_hint) is PosixPath:
-            file_hint = file_hint.__str__()
-        if '.' in file_hint:
-            file_name, file_extension = file_hint.split('.')
-            return file_extension
-        else:
-            return file_hint
-
-    def select(self, file_hint: str, default_file_type=None) -> DataInterfaceBase:
+    def select_data_interface(self, file_hint: str, default_file_type=None) -> DataInterfaceBase:
         """
         Select the appropriate data interface based on the file_hint.
 
@@ -219,14 +217,31 @@ class DataInterfaceManagerBase:
             default_file_type: default file type to use, if the file_hint doesn't specify.
         Returns: A DataInterface.
         """
-        file_hint = self.parse_file_hint(file_hint)
+        file_hint = self._parse_file_hint(file_hint)
         if file_hint in self.registered_interfaces:
-            return self.instantiate_data_interface(file_hint)
+            return self._instantiate_data_interface(file_hint)
         elif default_file_type is not None:
-            return self.instantiate_data_interface(default_file_type)
+            return self._instantiate_data_interface(default_file_type)
         else:
             raise ValueError("File hint {} not recognized. Supported file types include {}".format(
                 file_hint, list(self.registered_interfaces.keys())))
+
+    def _instantiate_data_interface(self, file_type: str) -> DataInterfaceBase:
+        if file_type in self.registered_interfaces:
+            return self.registered_interfaces[file_type]()
+        else:
+            raise ValueError("File type {} not recognized. Supported file types include {}".format(
+                file_type, list(self.registered_interfaces.keys())))
+
+    @staticmethod
+    def _parse_file_hint(file_hint: str) -> str:
+        if type(file_hint) is PosixPath:
+            file_hint = file_hint.__str__()
+        if '.' in file_hint:
+            file_name, file_extension = file_hint.split('.')
+            return file_extension
+        else:
+            return file_hint
 
 
 all_live_interfaces = [
@@ -241,9 +256,9 @@ all_live_interfaces = [
     YAMLDataInterface,
 ]
 
-DataInterfaceManager = DataInterfaceManagerBase()
+MagicDataInterface = MagicDataInterfaceBase()
 for interface in all_live_interfaces:
-    DataInterfaceManager.register_data_interface(interface)
+    MagicDataInterface.register_data_interface(interface)
 
-TestDataInterfaceManager = DataInterfaceManagerBase()
-TestDataInterfaceManager.register_data_interface(TestingDataInterface)
+TestMagicDataInterface = MagicDataInterfaceBase()
+TestMagicDataInterface.register_data_interface(TestingDataInterface)

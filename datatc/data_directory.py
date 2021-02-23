@@ -5,7 +5,7 @@ import yaml
 from typing import Any, Dict, List, Union
 import warnings
 
-from datatc.data_interface import DataInterfaceManager
+from datatc.data_interface import MagicDataInterface
 from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface
 
 
@@ -186,7 +186,7 @@ class DataDirectory:
     data_dir_manager = DataDirectoryManager
 
     def __init__(self, path: str, contents: Dict[str, 'DataDirectory'] = None,
-                 data_interface_manager=DataInterfaceManager):
+                 magic_data_interface=MagicDataInterface):
         """
         Initialize a DataDirectory at a path. The contents of that DataDirectory are recursively characterized and the
         DataDirectory's data_type set. For testing purposes, the contents can also be set directly.
@@ -194,7 +194,7 @@ class DataDirectory:
         Args:
             path: A file path at which to instantiate the DataDirectory.
             contents: The files and subdirectories contained in the directory.
-            data_interface_manager: DataInterfaceManager object to use to interface with files.
+            magic_data_interface: MagicDataInterface object to use to interface with files.
         """
         self.path = Path(path).expanduser().resolve()
         if not self.path.exists():
@@ -206,7 +206,7 @@ class DataDirectory:
             self.contents = contents
         # determine_data_type has to be done _after_ characterize dir because it inspects the children
         self.data_type = self._determine_data_type()
-        self.data_interface_manager = data_interface_manager
+        self.magic_data_interface = magic_data_interface
 
     @classmethod
     def register_project(cls, project_hint: str, project_path: str) -> None:
@@ -305,8 +305,7 @@ class DataDirectory:
         self.contents[new_data_dir.name] = new_data_dir
 
     def _save_file(self, data: Any, file_name: str, **kwargs) -> 'DataFile':
-        data_interface = self.data_interface_manager.select(file_name)
-        saved_file_path = data_interface.save(data, file_name, self.path, **kwargs)
+        saved_file_path = self.magic_data_interface.save(data, str(Path(self.path, file_name)), **kwargs)
         return DataFile(saved_file_path)
 
     def _save_self_aware_data(self, data: Any, file_name: str, **kwargs) -> 'SelfAwareDataDirectory':
@@ -477,8 +476,8 @@ class DataFile(DataDirectory):
 
         """
         if data_interface_hint is None:
-            data_interface = self.data_interface_manager.select(self.data_type)
+            data_interface = self.magic_data_interface.select_data_interface(self.data_type)
         else:
-            data_interface = self.data_interface_manager.select(data_interface_hint)
+            data_interface = self.magic_data_interface.select_data_interface(data_interface_hint)
         print('Loading {}'.format(self.path))
         return data_interface.load(self.path, **kwargs)

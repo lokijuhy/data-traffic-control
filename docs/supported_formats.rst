@@ -13,7 +13,6 @@ these are noted with an asterisk and explained below.*
  * PDF*
  * Pickle
  * Text
- * Text
  * YAML
 
 

@@ -2,21 +2,24 @@ Getting Started
 ===============
 
 
-Register a project with `DataManager`
+Register a project
 -------------------------------------
-`datatc` will remember for you where the data for each of your projects is stored, so that you don't have to. The first time you use `datatc` with a project, register it with :class:`datatc.data_manager.DataManager`. You only have to do this once- ``DataManager`` saves the information in ``~/.data_map.yaml`` so you never have to memorize that long file path again.
+`datatc` will remember for you where the data for each of your projects is stored, so that you don't have to.
+The first time you use `datatc` with a project, register it with ``DataDirectory``.
+You only have to do this once- `datatc` saves the information in ``~/.data_map.yaml``
+so you never have to memorize that long file path again.
 
->>> DataManager.register_project('project_name', '/path/to/project/data/dir/')
+>>> DataDirectory.register_project('project_name', '/path/to/project/data/dir/')
 
 Example:
 
->>> DataManager.register_project('mridle', '/home/user/data/mridle/data')
+>>> DataDirectory.register_project('mridle', '/home/user/data/mridle/data')
 
-Once you've registered a project, you can establish a `DataManager` on the fly by referencing it's name.
+Once you've registered a project, you can establish a ``DataDirectory`` on the fly by referencing it's name.
 
->>> dm = DataManager('mridle')
+>>> dd = DataDirectory.load('mridle')
 
-The `DataManager` object, ``dm``, will be your gateway to all file discovery, load, and save operations.
+The ``DataDirectory`` object, ``dd``, will be your gateway to all file discovery, load, and save operations.
 
 
 ----
@@ -25,9 +28,10 @@ The `DataManager` object, ``dm``, will be your gateway to all file discovery, lo
 Explore the data directory
 --------------------------
 
-`DataManager` makes it easier to interact with your project's data directory. With ``ls()``, you can print out the file structure:
+``DataDirectory`` makes it easier to interact with your project's data directory.
+With ``ls()``, you can print out the file structure:
 
->>> dm.ls()
+>>> dd.ls()
 raw/
     EntityViews/
         7 mixed items
@@ -43,7 +47,7 @@ raw/
 
 You can also print the contents of a subdirectory by navigating to it via the ``[]`` operators:
 
->>> dm['data_extracts'].ls(full=True)
+>>> dd['data_extracts'].ls(full=True)
 data_extracts/
     2019-11-23_Extract_3days/
         2019-11-23_Extract_3days.xlsx
@@ -64,10 +68,10 @@ Loading data files
 
 To load a file, navigate the file system using ``[]`` operators, and then call ``.load()``.
 
->>> raw_df = dm['data_extracts']['2020-02-04_Extract_3months']['2020-02-04_Extract_3months.xlsx'].load()
+>>> raw_df = dd['data_extracts']['2020-02-04_Extract_3months']['2020-02-04_Extract_3months.xlsx'].load()
 
 
-Don't worry about what format the file is in- `DataManager` will intuit how to load the file.
+Don't worry about what format the file is in- `datatc` will intuit how to load the file. See :ref:`supported_formats`.
 
 
 Shortcuts for loading data files *faster*
@@ -77,18 +81,18 @@ latest
 ..........
 If you use timestamps to version your data files, you can load the latest file or subdirectory within a directory with ``.latest()``:
 
->>> raw_df = dm['data_extracts'].latest()['2020-02-04_Extract_3months.xlsx'].load()
+>>> raw_df = dd['data_extracts'].latest()['2020-02-04_Extract_3months.xlsx'].load()
 
 select
 ..........
 
-To help you navigate those long finicky file names, `DataManager` provides a ``.select('hint')`` method to search for files matching a substring.
+To help you navigate those long finicky file names, ``DataDirectory`` provides a ``.select('hint')`` method to search for files matching a substring.
 
->>> raw_df = dm['data_extracts']['2020-02-04_Extract_3months'].select('xlsx').load()
+>>> raw_df = dd['data_extracts']['2020-02-04_Extract_3months'].select('xlsx').load()
 
 Combing *latest* and *select*, the file load in the previous can be reduced to the following:
 
->>> raw_df = dm['data_extracts'].latest().select('xlsx').load()
+>>> raw_df = dd['data_extracts'].latest().select('xlsx').load()
 
 Loading irregular data files
 ''''''''''''''''''''''''''''''''''''''''''
@@ -98,17 +102,20 @@ Loading irregular data files
 If your file needs special parameters to load it, specify them in ``load``, and they will be passed on to the internal loading function.
 For example, if your csv file is actually pipe separated and has a non-default encoding, you can specify so:
 
->>> raw_df = dm['queries']['batch_query.csv'].load(sep='|', encoding='utf-16')
+>>> raw_df = dd['queries']['batch_query.csv'].load(sep='|', encoding='utf-16')
 
 ... my file type isn't recognized by `datatc`
 ................................................
-If `DataManager` doesn't recognize the file type, you can give it a type hint of which loader to use. For example, `DataManager` doesn't have a specific interface for reading tab separated files, but if you tell it to treat it as a csv, it will load it right up:
+If `datatc` doesn't recognize the file type, you can give it a type hint of which loader to use.
+For example, `datatc` doesn't have a specific interface for reading tab separated files,
+but if you tell it to treat it as a csv and instruct it to use tab as the separator, it will load it right up:
 
->>> raw_df = dm['queries']['batch_query.tsv'].load(data_interface_hint='csv')
+>>> raw_df = dd['queries']['batch_query.tsv'].load(data_interface_hint='csv', sep='\t')
 
 ... I want to load my file my own way
 ................................................
-If you ever want to do your own load, and not use the build in ``.load()``, you can also use ``dm[...]['filename'].path`` to get the path to the file for use in a separate loading operation.
+If you ever want to do your own load, and not use the build in ``.load()``, you can also use ``dd[...]['filename'].path``
+to get the path to the file for use in a separate loading operation.
 
 
 ----
@@ -117,13 +124,14 @@ If you ever want to do your own load, and not use the build in ``.load()``, you 
 Saving data files
 ------------------
 
-To save a file, navigate with ``dm`` to the position in the file system where you'd like to save your file using the ``[]`` operators, and then call ``.save(data_object, file_name)``.
+To save a file, navigate with ``dd`` to the position in the file system where you'd like to save your file using the ``[]`` operators,
+and then call ``.save(data_object, file_name)``.
 
 For example:
 
 .. code-block:: python
 
-    dm['processed_data'].save(processed_df, 'processed.csv')
+    dd['processed_data'].save(processed_df, 'processed.csv')
 
 
 ----
@@ -163,7 +171,7 @@ If you need to specify arguments to your ``transform_func``, do so as keyword ar
 
 .. note::
     Note on Tracking Git Metadata: To ensure traceability, ``SelfAwareData`` checks that there are no uncommitted changes in the repo before running the transform.
-    If there are uncommitted changes, `datatc`` raises a ``RuntimeError``. If you would like to override this check, specify ``enforce_clean_git = False`` in ``transform()``.
+    If there are uncommitted changes, `datatc` raises a ``RuntimeError``. If you would like to override this check, specify ``enforce_clean_git = False`` in ``transform()``.
 
 .. note::
     If the ``transform_func`` you pass to ``transform()`` is written in a file in a git repo, then `datatc` will include the git hash of the repo where ``transform_func`` is written.
@@ -174,7 +182,7 @@ If you need to specify arguments to your ``transform_func``, do so as keyword ar
 `SelfAwareData` objects automatically track their own metadata
 .................................................................
 
-By using the `SelfAwareData.transform` method, metadata about the transformation is automatically tracked, including:
+By using the ``SelfAwareData.transform`` method, metadata about the transformation is automatically tracked, including:
 
 * the timestamp of when the transformation was run
 * the git hash of the repo where ``transform_func`` is located
@@ -185,14 +193,14 @@ To access metadata, you can print the transform steps:
 
 >>> new_sad.print_steps()
 --------------------------------------------------------------------------------
-Step  0               2021-01-27 21:46          no_git_hash
+Step  0               2021-01-27 21:46          #f98fc21
 --------------------------------------------------------------------------------
 def transform_step_1(input_df):
     df = input_df.copy()
     df['col_1'] = df['col_1'] * -1
     return df
 --------------------------------------------------------------------------------
-Step  1               2021-01-27 21:46          no_git_hash
+Step  1               2021-01-27 21:46          #f98fc21
 --------------------------------------------------------------------------------
 def transform_step_2(input_df):
     df = input_df.copy()
@@ -208,14 +216,14 @@ To access the data programatically, use ``SelfAwareData.get_info()``:
       'tag': '',
       'code': "def transform_step_1(input_df):\n    df = input_df.copy()\n    df['col_1'] = df['col_1'] * -1\n    return df\n",
       'kwargs': {},
-      'git_hash': 'no_git_hash'
+      'git_hash': 'f98fc21'
     },
     {
         'timestamp': '2021-01-27_21-46-55',
         'tag': '',
         'code': "def transform_step_2(input_df):\n    df = input_df.copy()\n    df['col_2'] = df['col_2']**2\n    return df\n",
         'kwargs': {},
-        'git_hash': 'no_git_hash'
+        'git_hash': 'f98fc21'
     }
 ]
 
@@ -225,11 +233,11 @@ Save
 
 There are 2 ways to save ``SelfAwareData`` objects.
 
-1. If you are using ``DataManager``, then saving your ``SelfAwareData`` works the same as saving any other file with ``DataManager``.
+1. If you are using ``DataDirectory``, then saving your ``SelfAwareData`` works the same as saving any other file with ``DataDirectory``.
 
->>> dm['directory'].save(sad, output_file_name)
+>>> dd['directory'].save(sad, output_file_name)
 
-2. You can also save ``SelfAwareData``, independently, without using ``DataManager``.
+2. You can also save ``SelfAwareData``, independently, without using ``DataDirectory``.
 
 >>> sad.save(output_file_path)
 
@@ -237,9 +245,9 @@ There are 2 ways to save ``SelfAwareData`` objects.
 Load
 '''''''
 
-Loading `SelfAwareData` works the same as loading any other data file with DataManager.
+Loading `SelfAwareData` works the same as loading any other data file with ``DataDirectory``.
 
->>> sad = dm['feature_sets']['my_feature_set.csv'].load()
+>>> sad = dd['feature_sets']['my_feature_set.csv'].load()
 
 This load returns you a `SelfAwareData` object. This object contains not only the data you transformed and saved, but also the transformation function itself.
 
@@ -255,15 +263,15 @@ To rerun the same transformation function on a new data object:
 
 >>> sad.rerun(new_df)
 
-Loading `SelfAwareData` objects without ``DataManager``
+Loading `SelfAwareData` objects without ``DataDirectory``
 .......................................................
 
-You can also load ``SelfAwareData`` objects without going through ``DataManager``:
+You can also load ``SelfAwareData`` objects without going through ``DataDirectory``:
 
 >>> sad = SelfAwareData.load(file_path)
 
 However, ``SelfAwareData`` objects are saved to the file system as directories with long names, like ``sad_dir__2021-01-01_12-00__transform_1``.
-When you interact with ``SelfAwareData`` via ``DataManager``, you can reference them like normal files (``transform_1.csv``), however, referencing them outside of ``DataMaanger`` is not as easy.
+When you interact with ``SelfAwareData`` via ``DataDirectory``, you can reference them like normal files (``transform_1.csv``), however, referencing them outside of ``DataDirectory`` is not as easy.
 
 Loading `SelfAwareData` objects in dependency-incomplete environments
 .............................................................................
@@ -275,26 +283,26 @@ use
 
 to avoid a ``ModuleNotFoundError``.
 
-``SelfAwareData`` Example
+`SelfAwareData` Example
 '''''''''''''''''''''''''
 
 Here's a toy example of working with ``SelfAwareData``:
 
 .. code-block:: python
 
-    from datatc import DataManager, SelfAwareData
+    from datatc import DataDirectory, SelfAwareData
 
-    dm = DataManager('datatc_demo')
+    dd = DataDirectory.load('datatc_demo')
 
-    raw_sad = SelfAwareData.load_from_file(dm['raw']['iris.csv'].path)
+    raw_sad = SelfAwareData.load_from_file(dd['raw']['iris.csv'].path)
 
     def petal_area(df):
         df['petal_area'] = df['petal_length'] * df['petal_width']
         return df
 
-    area_sad = raw_sad.transform(petal_area, 'compute_petal_area')
+    area_sad = raw_sad.transform(petal_area)
 
-    dm['processed'].save(area_sad, 'area.csv')
+    dd['processed'].save(area_sad, 'area.csv')
 
 ----
 

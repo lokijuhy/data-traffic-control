@@ -1,13 +1,6 @@
 API Reference
 =============
 
-DataManager
-------------
-
-.. autoclass:: datatc.data_manager.DataManager
-    :members:
-
-    .. automethod:: __init__
 
 DataDirectory
 -------------
@@ -24,6 +17,7 @@ DataFile
 
 .. autoclass:: datatc.data_directory.DataFile
     :members:
+
 
 SelfAwareData
 ---------------

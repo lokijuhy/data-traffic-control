@@ -1,7 +1,9 @@
 import glob
 import os
 from pathlib import Path
+import yaml
 from typing import Any, Dict, List, Union
+import warnings
 
 from datatc.data_interface import DataInterfaceManager
 from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface
@@ -10,21 +12,193 @@ from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface
 DIRS_TO_IGNORE = ['__pycache__']
 
 
+class DataDirectoryManager:
+
+    config_file_name = '.data_map.yaml'
+
+    @classmethod
+    def register_project(cls, project_hint: str, project_path: str) -> None:
+        """
+        Register project and its data path to the config.
+        If no config exists, create one.
+
+        Args:
+            project_hint: Name for project
+            project_path: Path to project's data directory
+
+        Raises: ValueError if project_hint already exists in file
+
+        """
+        # check that project_path is a valid path
+        expanded_project_path = Path(project_path).expanduser()
+        if not expanded_project_path.exists():
+            raise FileNotFoundError("Not a valid path: '{}'".format(project_path))
+
+        config_file_path = Path(Path.home(), cls.config_file_name)
+        if not config_file_path.exists():
+            cls._init_config()
+
+        config = cls._load_config()
+        hint_already_in_file = cls._check_for_entry_in_config(project_hint, config)
+        if hint_already_in_file:
+            raise ValueError("Project hint '{}' is already registered".format(project_hint))
+
+        cls._register_project_to_file(project_hint, expanded_project_path, config_file_path)
+
+    @classmethod
+    def load_project_path_from_hint(cls, hint):
+        """
+        Determine the data_path from the hint.
+          Look for a data_map config, and look for hint within the config.
+          Otherwise, the hint may be a legitimate path, in which case use it.
+          If neither of the above work, raise an error.
+
+        Args:
+            hint: project hint previously registered, or a real path.
+
+        Returns: path registered for the hint
+
+        """
+
+        if cls._config_exists():
+            config = cls._load_config()
+            if config is not None and hint in config:
+                expanded_config_path = Path(config[hint]['path']).expanduser().resolve()
+                if expanded_config_path.exists():
+                    return expanded_config_path
+                else:
+                    raise ValueError("Path provided in config for '{}' does not exist: {}".format(hint,
+                                                                                                  expanded_config_path))
+
+        expanded_path = Path(hint).expanduser().resolve()
+        if expanded_path.exists():
+            return expanded_path
+
+        raise ValueError("Provided hint '{}' is not registered and is not a valid path. "
+                         "\n\nRegister your project with `DataManager.register_project(project_hint, project_path)`"
+                         "".format(hint))
+
+    @classmethod
+    def list_projects(cls) -> None:
+        """List the projects known to `DataManager`."""
+        config = cls._load_config()
+        if len(config) == 0:
+            print("No projects registered!")
+        for project_hint in config:
+            print("{}: {}".format(project_hint, config[project_hint]['path']))
+
+    @classmethod
+    def _init_config(cls):
+        """Create an empty config file."""
+        config_path = Path(Path.home(), cls.config_file_name)
+        print("Creating config at {}".format(config_path))
+        open(config_path.__str__(), 'x').close()
+
+    @classmethod
+    def _config_exists(cls) -> bool:
+        """Determine whether a config file exists"""
+        config_path = Path(Path.home(), cls.config_file_name)
+        if config_path.exists():
+            return True
+        else:
+            return False
+
+    @classmethod
+    def _load_config(cls) -> Dict:
+        """Load the config file. If config file is empty, return an empty dict."""
+        config_path = Path(Path.home(), cls.config_file_name)
+        if cls._config_exists():
+            config = yaml.safe_load(open(config_path.__str__()))
+            if config is None:
+                config = {}
+            return config
+        else:
+            raise FileNotFoundError('Config file not found at: {}'.format(config_path))
+
+    @staticmethod
+    def _check_for_entry_in_config(project_hint: str, config: Dict) -> bool:
+        """
+        Returns whether project_hint already exists in config file.
+
+        Args:
+            project_hint: Name for the project.
+            config: The config dict.
+
+        Returns: Bool for whether the project_hint is registered in the config.
+
+        """
+        if config is None:
+            return False
+
+        if project_hint in config:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def _get_path_for_project_hint(cls, project_hint: str, config: Dict) -> Path:
+        if cls._check_for_entry_in_config(project_hint, config):
+            return Path(config[project_hint]['path'])
+        else:
+            raise ValueError("Project hint '{}' is not registered".format(project_hint))
+
+    @staticmethod
+    def _register_project_to_file(project_hint: str, project_path: Path, config_file_path: Path):
+        """
+        Appends project details to specified config file.
+
+        Args:
+            project_hint: The name for the project.
+            project_path: Path to project data directory.
+            config_file_path: Path to config file.
+
+        Returns: None.
+
+        """
+        config_entry_data = {
+            project_hint: {
+                'path': project_path.__str__(),
+            }
+        }
+        with open(config_file_path.__str__(), 'a') as f:
+            yaml.dump(config_entry_data, f, default_flow_style=False)
+
+
+class TestingDataDirectoryManager(DataDirectoryManager):
+    """DataDirectoryManager useful for testing purposes, as it does not interact with the file system."""
+
+    @classmethod
+    def _config_exists(cls):
+        return True
+
+    @classmethod
+    def _load_config(cls) -> Dict:
+        return {'test': '.'}
+
+    @staticmethod
+    def _register_project_to_file(project_hint: str, project_path: Path, config_file_path: Path):
+        return
+
+
 class DataDirectory:
     """Manages saving, loading, and viewing data files within a specific data path."""
 
-    def __init__(self, path, contents: Dict[str, 'DataDirectory'] = None, data_interface_manager=DataInterfaceManager):
+    data_dir_manager = DataDirectoryManager
+
+    def __init__(self, path: str, contents: Dict[str, 'DataDirectory'] = None,
+                 data_interface_manager=DataInterfaceManager):
         """
         Initialize a DataDirectory at a path. The contents of that DataDirectory are recursively characterized and the
         DataDirectory's data_type set. For testing purposes, the contents can also be set directly.
 
         Args:
-            path: The file path to which the DataDirectory corresponds.
+            path: A file path at which to instantiate the DataDirectory.
             contents: The files and subdirectories contained in the directory.
             data_interface_manager: DataInterfaceManager object to use to interface with files.
         """
-        # TODO: check path
-        self.path = Path(path).resolve()
+        self.path = Path(path).expanduser().resolve()
+        if not self.path.exists():
+            warnings.warn('DataDirectory path does not exist: {}'.format(self.path), RuntimeWarning)
         self.name = os.path.basename(self.path)
         if contents is None:
             self.contents = self._characterize_dir(self.path)
@@ -34,8 +208,32 @@ class DataDirectory:
         self.data_type = self._determine_data_type()
         self.data_interface_manager = data_interface_manager
 
+    @classmethod
+    def register_project(cls, project_hint: str, project_path: str) -> None:
+        """Register a hint for a project data directory so that it can be easily reloaded via `load(hint)`."""
+        return cls.data_dir_manager.register_project(project_hint, project_path)
+
+    @classmethod
+    def list_projects(cls) -> None:
+        """List all data directories previously registered via `register_project`."""
+        return cls.data_dir_manager.list_projects()
+
+    @classmethod
+    def load_project(cls, hint):
+        """Create a DataDirectory from a project hint previously registered via `register_project`."""
+        path = cls.data_dir_manager.load_project_path_from_hint(hint)
+        return cls(path)
+
+    @classmethod
+    def load(cls, hint):
+        """Shortcut for `load_project`."""
+        return cls.load_project(hint)
+
     def __getitem__(self, key):
         return self.contents[key]
+
+    def reload(self):
+        self.contents = self._characterize_dir(self.path)
 
     def is_file(self):
         return False
@@ -114,9 +312,6 @@ class DataDirectory:
     def _save_self_aware_data(self, data: Any, file_name: str, **kwargs) -> 'SelfAwareDataDirectory':
         new_transform_dir_path = SelfAwareDataInterface.save(data, parent_path=self.path, file_name=file_name, **kwargs)
         return SelfAwareDataDirectory(new_transform_dir_path)
-
-    def load(self):
-        raise NotImplementedError("Loading the entire contents of a directory has not yet been implemented!")
 
     @staticmethod
     def _characterize_dir(path) -> Dict[str, 'DataDirectory']:

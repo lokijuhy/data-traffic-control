@@ -4,7 +4,8 @@ import pandas as pd
 from pathlib import Path
 import shutil
 import tempfile
-from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface, FileSourceTransformStep
+from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface, LiveTransformStep, SourceFileTransformStep,\
+    IntermediateFileTransformStep
 
 
 class TestSelfAwareData(unittest.TestCase):
@@ -75,6 +76,12 @@ class TestSelfAwareData(unittest.TestCase):
 
         # assert the reloaded data is same as what was saved
         pd.testing.assert_frame_equal(reloaded_sad.data, my_sad.data)
+
+        # assert there is 1 transform step and 1 intermediate file step
+        transform_sequence = reloaded_sad.transform_sequence.sequence
+        self.assertEqual(len(transform_sequence), 2)
+        self.assertEqual(type(transform_sequence[0]), LiveTransformStep)
+        self.assertEqual(type(transform_sequence[1]), IntermediateFileTransformStep)
 
         # assert print_steps runs without error
         reloaded_sad.print_steps()
@@ -175,7 +182,7 @@ class TestSelfAwareData(unittest.TestCase):
         from_file_sad = SelfAwareData.load_from_file(raw_data_path)
 
         self.assertEqual(len(from_file_sad.transform_sequence.sequence), 1)
-        self.assertTrue(type(from_file_sad.transform_sequence.sequence[0]), FileSourceTransformStep)
+        self.assertTrue(type(from_file_sad.transform_sequence.sequence[0]), SourceFileTransformStep)
 
     def test_save_untransformed(self):
         raw_sad = SelfAwareData(self.raw_df)
@@ -198,8 +205,8 @@ class TestSelfAwareData(unittest.TestCase):
 
     def test_load_interface_version_0(self):
         raw_sad = SelfAwareData(self.raw_df)
-        my_sad = raw_sad.transform(self.transform_func, tag='v0_sad', enforce_clean_git=False)
-        sad_file_path = SelfAwareDataInterface.save(my_sad, parent_path=self.test_dir, file_name='new_sad.csv',
+        my_sad = raw_sad.transform(self.transform_func, 'unrecorded_tag', enforce_clean_git=False)
+        sad_file_path = SelfAwareDataInterface.save(my_sad, parent_path=self.test_dir, file_name='v0_sad.csv',
                                                     interface_version=0, index=False)
         # assert a new directory was created, and the path matches the return value
         self.assertTrue(Path(sad_file_path).exists())
@@ -219,6 +226,12 @@ class TestSelfAwareData(unittest.TestCase):
         # assert the reloaded data is same as what was saved
         pd.testing.assert_frame_equal(reloaded_v0_sad.data, my_sad.data)
 
+        # assert there is 1 transform step and 1 intermediate file step
+        transform_sequence = reloaded_v0_sad.transform_sequence.sequence
+        self.assertEqual(len(transform_sequence), 2)
+        self.assertEqual(type(transform_sequence[0]), LiveTransformStep)
+        self.assertEqual(type(transform_sequence[1]), IntermediateFileTransformStep)
+
         # assert print_steps runs without error
         reloaded_v0_sad.print_steps()
 
@@ -228,7 +241,7 @@ class TestSelfAwareData(unittest.TestCase):
         pd.testing.assert_frame_equal(rerun_df, manually_transformed_df)
 
         # test get_info
-        transform_info = my_sad.get_info()
+        transform_info = reloaded_v0_sad.get_info()
         print(transform_info)
 
         expected_transform_info_keys = {'timestamp', 'git_hash', 'tag', 'kwargs', 'code'}
@@ -236,7 +249,7 @@ class TestSelfAwareData(unittest.TestCase):
             'tag': 'v0_sad',
             'kwargs': {},
         }
-        self.assertEqual(len(transform_info), 1)  # 1 transform
+        self.assertEqual(len(transform_info), 2)  # 1 transform step and 1 intermediate file step
         transform_step_0_info = transform_info[0]
         self.assertTrue(set(transform_step_0_info.keys()) == expected_transform_info_keys)
         for key in expected_info:

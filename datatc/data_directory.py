@@ -5,8 +5,8 @@ import yaml
 from typing import Any, Dict, List, Union
 import warnings
 
-from datatc.data_interface import MagicDataInterface
-from datatc.self_aware_data import SelfAwareData, SelfAwareDataInterface
+from .data_interface import MagicDataInterface
+from .self_aware_data import SelfAwareData, SelfAwareDataInterface
 
 
 DIRS_TO_IGNORE = ['__pycache__']

@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
-from datatc.data_interface import MagicDataInterface, DillDataInterface, TextDataInterface, YAMLDataInterface
-from datatc.git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_from_path
+from .data_interface import MagicDataInterface, DillDataInterface, TextDataInterface, YAMLDataInterface
+from .git_utilities import get_git_repo_of_func, check_for_uncommitted_git_changes_at_path, get_git_hash_from_path
 
 
 class SADTimestamp:
@@ -89,6 +89,8 @@ class LiveTransformStep(TransformStepBase):
     def print_step(self, step_no) -> None:
         print("-" * 80)
         print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, '#'+self.git_hash))
+        if self.tag is not None and self.tag != '':
+            print(self.tag)
         print("-" * 80)
         print(self.code)
         if self.kwargs is not None and len(self.kwargs) > 0:
@@ -148,6 +150,8 @@ class StaticTransformStep(TransformStepBase):
     def print_step(self, step_no) -> None:
         print("-" * 80)
         print("Step {:>2} {:>30} {:>20}".format(step_no, self.timestamp, '#'+self.git_hash))
+        if self.tag is not None and self.tag != '':
+            print(self.tag)
         print("-" * 80)
         print(self.code)
         if self.kwargs is not None and len(self.kwargs) > 0:
@@ -160,7 +164,9 @@ class StaticTransformStep(TransformStepBase):
         raise RuntimeError('rerun is not available for StaticTransformSteps')
 
 
-class FileSourceTransformStep(TransformStepBase):
+class FileBasedTransformStep(TransformStepBase):
+
+    step_name = 'File'
 
     def __init__(self, file_path: str):
         """
@@ -182,11 +188,26 @@ class FileSourceTransformStep(TransformStepBase):
         print("-" * 80)
         print("Step {:>2}".format(step_no))
         print("-" * 80)
-        print('Source file: {}'.format(self.file_path))
+        print('{}: {}'.format(self.step_name, self.file_path))
         print()
 
     def rerun(self, data: Any):
-        raise RuntimeError('rerun is not available for FileSourceTransformSteps')
+        raise RuntimeError('rerun is not available for FileBasedTransformSteps')
+
+
+class SourceFileTransformStep(FileBasedTransformStep):
+
+    step_name = 'Source file'
+
+
+class FileSourceTransformStep(FileBasedTransformStep):
+    """exists only for backwards compatibility"""
+    step_name = 'Source file'
+
+
+class IntermediateFileTransformStep(FileBasedTransformStep):
+
+    step_name = 'Intermediate file'
 
 
 class TransformStepInterface:
@@ -229,8 +250,8 @@ class TransformStepInterface:
         return StaticTransformStep(metadata)
 
     @staticmethod
-    def from_file_path(file_path: str) -> FileSourceTransformStep:
-        return FileSourceTransformStep(file_path)
+    def from_file_path(file_path: str) -> SourceFileTransformStep:
+        return SourceFileTransformStep(file_path)
 
     @staticmethod
     def get_git_hash(transformer_func, get_git_hash_from, enforce_clean_git: bool = True) -> Union[str, None]:
@@ -339,12 +360,12 @@ class SelfAwareData:
     @classmethod
     def load_from_file(cls, file_path: str) -> 'SelfAwareData':
         """
-        Create a SelfAwareData object with a initial FileSourceTransformStep
+        Create a SelfAwareData object with a initial SourceFileTransformStep
 
         Args:
             file_path: path to a standard file (not already a SelfAwareData)
 
-        Returns: SelfAwareData with a TransformSequence containing a FileSourceTransformStep pointing to file_path
+        Returns: SelfAwareData with a TransformSequence containing a SourceFileTransformStep pointing to file_path
 
         """
         data = MagicDataInterface.load(file_path)
@@ -558,6 +579,7 @@ class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
         metadata = {'code': transformer_code, **info}
         transform_step = LiveTransformStep(metadata=metadata, transformer_func=transformer_func)
         transform_sequence = TransformSequence([transform_step])
+        transform_sequence.append(IntermediateFileTransformStep(path))
         return SelfAwareData(data, transform_sequence)
 
     @classmethod
@@ -673,14 +695,15 @@ class SelfAwareDataInterface_v1(VersionedSelfAwareDataInterface):
 
         if load_function:
             sad = cls.file_component_interfaces['sad'].load(sad_file)
-            return sad
         else:
             data_interface = MagicDataInterface.select_data_interface(data_file, default_file_type=data_interface_hint)
             data = data_interface.load(data_file, **kwargs)
             metadata = cls.file_component_interfaces['provenance'].load(metadata_file)
             # TODO: make function to add and extract version from sequence file
             metadata = metadata['sequence']
-            return SelfAwareData(data, metadata)
+            sad = SelfAwareData(data, metadata)
+        sad.transform_sequence.append(IntermediateFileTransformStep(path))
+        return sad
 
     @classmethod
     def get_info(cls, path: str) -> Dict:

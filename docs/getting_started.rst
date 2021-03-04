@@ -304,6 +304,21 @@ Here's a toy example of working with ``SelfAwareData``:
 
     dd['processed'].save(area_sad, 'area.csv')
 
+View your `SelfAwareData` tree with the datatc web app!
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+You can view the tree of how your SelfAwareData files are related in the datatc web app.
+To start the web app, run the ``datatc_app`` command in your shell and provide the name of the data directory you'd like to view.
+This data directory name must have been previously registered to datatc with ``DataDirectory.regiser_project()``.
+
+>>> datatc_app <registered_data_dir_name>
+
+If you need a reminder of what project hints you've registered with datatc, run ``datatc_list``.
+
+.. note::
+    To use the web app, install datatc with the extra app dependencies: ``pip install datatc[app]``.
+    If you're using zsh, you'll need to escape the square brackets with ``pip install datatc\[app\]``
+
 ----
 
 

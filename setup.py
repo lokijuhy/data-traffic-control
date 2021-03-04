@@ -37,7 +37,19 @@ setup(name='datatc',
             'xlrd',
       ],
       extras_require={
+            'app': [
+                  'dash',
+                  'dash_cytoscape',
+                  'dash_html_components',
+                  'dash_core_components',
+            ],
             'pdf': ['pymupdf'],
             'docs': ['sphinx_autodoc_typehints'],
+      },
+      entry_points={
+          'console_scripts': [
+                'datatc_app = datatc.dashboard.dashboard:main',
+                'datatc_list = datatc.data_directory:DataDirectoryManager.list_projects',
+          ]
       },
       zip_safe=False)

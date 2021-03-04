@@ -41,7 +41,7 @@ class DataProcessorCacheManager:
         if self.check_name_already_exists(file_name, file_dir_path):
             raise ValueError("That data processor name is already in use")
 
-        data_interface = di.DataInterfaceManager.select(data_file_type)
+        data_interface = di.MagicDataInterface.select(data_file_type)
         data = processing_func(data)
         data_interface.save(data, file_name, file_dir_path)
         self.processor_data_interface.save(processing_func, file_name + self.processor_designation, file_dir_path)
@@ -71,7 +71,7 @@ class DataProcessorCacheManager:
         # find and load the data
         if data_file_extension is None:
             data_file_extension = self.get_data_processor_data_type(file_name, file_dir_path)
-        data_interface = di.DataInterfaceManager.select(data_file_extension)
+        data_interface = di.MagicDataInterface.select(data_file_extension)
         data = data_interface.load(file_name, file_dir_path)
         return DataProcessor(data, processing_func, code)
 

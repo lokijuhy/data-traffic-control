@@ -1,5 +1,5 @@
 import warnings
-from datatc.data_directory import DataDirectory, DataDirectoryManager
+from .data_directory import DataDirectory, DataDirectoryManager
 from typing import Type
 
 CONFIG_FILE_NAME = '.data_map.yaml'

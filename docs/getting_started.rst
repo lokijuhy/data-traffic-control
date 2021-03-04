@@ -307,13 +307,14 @@ Here's a toy example of working with ``SelfAwareData``:
 View your `SelfAwareData` tree with the datatc web app!
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-You can view the tree of how your SelfAwareData files are related in the datatc web app.
-To start the web app, run the ``datatc_app`` command in your shell and provide the name of the data directory you'd like to view.
-This data directory name must have been previously registered to datatc with ``DataDirectory.regiser_project()``.
+You can view the tree of how your `SelfAwareData` files are related in the `datatc` web app.
+To start the web app, run the ``datatc_app`` command in your shell
+and provide the name of the project whose data directory you'd like to view.
 
->>> datatc_app <registered_data_dir_name>
+>>> datatc_app <registered_project>
 
-If you need a reminder of what project hints you've registered with datatc, run ``datatc_list``.
+This project must have been previously registered to datatc with ``DataDirectory.register_project()``.
+If you need a reminder of what projects you've registered with `datatc`, run ``datatc_list``.
 
 .. note::
     To use the web app, install datatc with the extra app dependencies: ``pip install datatc[app]``.

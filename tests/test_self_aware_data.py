@@ -181,6 +181,16 @@ class TestSelfAwareData(unittest.TestCase):
         self.raw_df.to_csv(raw_data_path, index=False)
         from_file_sad = SelfAwareData.load_from_file(raw_data_path)
 
+        pd.testing.assert_frame_equal(from_file_sad.data, self.raw_df)
+        self.assertEqual(len(from_file_sad.transform_sequence.sequence), 1)
+        self.assertTrue(type(from_file_sad.transform_sequence.sequence[0]), SourceFileTransformStep)
+
+    def test_load_SAD_from_file_with_kwargs(self):
+        raw_data_path = Path(self.test_dir, 'raw_df.csv')
+        self.raw_df.to_csv(raw_data_path, index=False, sep='|')
+        from_file_sad = SelfAwareData.load_from_file(raw_data_path, sep='|')
+
+        pd.testing.assert_frame_equal(from_file_sad.data, self.raw_df)
         self.assertEqual(len(from_file_sad.transform_sequence.sequence), 1)
         self.assertTrue(type(from_file_sad.transform_sequence.sequence[0]), SourceFileTransformStep)
 

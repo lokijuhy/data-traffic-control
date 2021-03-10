@@ -1,4 +1,5 @@
 import unittest
+import glob
 import os
 import pandas as pd
 from pathlib import Path
@@ -254,3 +255,16 @@ class TestSelfAwareData(unittest.TestCase):
         self.assertTrue(set(transform_step_0_info.keys()) == expected_transform_info_keys)
         for key in expected_info:
             self.assertEqual(transform_step_0_info[key], expected_info[key])
+
+    def test_save_fail_leaves_no_dir(self):
+        raw_sad = SelfAwareData(self.raw_df)
+        my_sad = raw_sad.transform(self.transform_func, enforce_clean_git=False)
+        sad_path = Path(self.test_dir, 'sad_fail.bad_file_ext')
+
+        with self.assertRaises(Exception) as context:
+            sad_file_path = my_sad.save(sad_path, index=False)
+
+        glob_path = Path(self.test_dir, '*')
+        subpaths = glob.glob(glob_path.__str__())
+        sad_dirs = [os.path.basename(file_path) for file_path in subpaths if 'sad_dir' in file_path]
+        self.assertEqual(len(sad_dirs), 0)

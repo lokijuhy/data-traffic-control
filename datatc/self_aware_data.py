@@ -359,7 +359,7 @@ class SelfAwareData:
         self.transform_sequence = TransformSequence(metadata)
 
     @classmethod
-    def load_from_file(cls, file_path: str) -> 'SelfAwareData':
+    def load_from_file(cls, file_path: str, **kwargs) -> 'SelfAwareData':
         """
         Create a SelfAwareData object with a initial SourceFileTransformStep
 
@@ -369,7 +369,7 @@ class SelfAwareData:
         Returns: SelfAwareData with a TransformSequence containing a SourceFileTransformStep pointing to file_path
 
         """
-        data = MagicDataInterface.load(file_path)
+        data = MagicDataInterface.load(file_path, **kwargs)
         metadata = [{'file_path': file_path}]
         return cls(data, metadata)
 

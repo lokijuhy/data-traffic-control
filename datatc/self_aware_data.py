@@ -3,6 +3,7 @@ import datetime
 import glob
 import inspect
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
@@ -541,10 +542,15 @@ class SelfAwareDataInterface_v0(VersionedSelfAwareDataInterface):
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
-        data_interface = MagicDataInterface.select_data_interface(data_file_type)
-        data_interface.save(sad.data, 'data', new_transform_dir_path, **kwargs)
-        cls.file_component_interfaces['func'].save(transformer_func, 'func', new_transform_dir_path)
-        cls.file_component_interfaces['code'].save(code, 'code', new_transform_dir_path)
+        try:
+            data_interface = MagicDataInterface.select_data_interface(data_file_type)
+            data_interface.save(sad.data, 'data', new_transform_dir_path, **kwargs)
+            cls.file_component_interfaces['func'].save(transformer_func, 'func', new_transform_dir_path)
+            cls.file_component_interfaces['code'].save(code, 'code', new_transform_dir_path)
+        except Exception:
+            # clean up the failed SAD dir before raising the error
+            shutil.rmtree(new_transform_dir_path)
+            raise
 
         print('created new file {}'.format(new_transform_dir_path))
         return new_transform_dir_path
@@ -660,16 +666,21 @@ class SelfAwareDataInterface_v1(VersionedSelfAwareDataInterface):
         new_transform_dir_path = Path(parent_path, transform_dir_name)
         os.makedirs(new_transform_dir_path)
 
-        data_interface = MagicDataInterface.select_data_interface(data_file_type)
-        data_interface.save(sad.data, 'data', new_transform_dir_path, **kwargs)
+        try:
+            data_interface = MagicDataInterface.select_data_interface(data_file_type)
+            data_interface.save(sad.data, 'data', new_transform_dir_path, **kwargs)
 
-        cls.file_component_interfaces['sad'].save(sad, 'sad', new_transform_dir_path)
+            cls.file_component_interfaces['sad'].save(sad, 'sad', new_transform_dir_path)
 
-        provenance = {
-            'interface_version': cls.version,
-            'transform_steps': sad.get_info()
-        }
-        cls.file_component_interfaces['provenance'].save(provenance, 'provenance', new_transform_dir_path)
+            provenance = {
+                'interface_version': cls.version,
+                'transform_steps': sad.get_info()
+            }
+            cls.file_component_interfaces['provenance'].save(provenance, 'provenance', new_transform_dir_path)
+        except Exception:
+            # clean up the failed SAD dir before raising the error
+            shutil.rmtree(new_transform_dir_path)
+            raise
 
         print('created new SAD directory {}'.format(new_transform_dir_path))
         return new_transform_dir_path

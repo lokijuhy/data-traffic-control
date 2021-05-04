@@ -13,7 +13,10 @@ Data files are the building materials we work with *every day, all day*. Working
 
 * Navigate your data directories with ease, without having to memorize long file paths.
 * Load data files without having to think about it (or looking it up the syntax yet again).
-* Be certain of how a datafile was generated, and rest easy knowing you could reproduce it. 
+* Be certain of how a datafile was generated, and rest easy knowing you could reproduce it.
+
+![app screenshot](./datatc_screenshot.png)
+_Vizualize how all of the files produced by your data experiments are related, and inspect how each one was produced._
 
 ## Installation
 

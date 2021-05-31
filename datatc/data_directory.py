@@ -312,6 +312,19 @@ class DataDirectory:
         new_transform_dir_path = SelfAwareDataInterface.save(data, parent_path=self.path, file_name=file_name, **kwargs)
         return SelfAwareDataDirectory(new_transform_dir_path)
 
+    def mkdir(self, dir_name: str):
+        """
+        Create a new directory within the current directory.
+        Args:
+            dir_name: Name for the new directory
+
+        Returns: None
+
+        """
+        dir_path = Path(self.path, dir_name)
+        os.makedirs(dir_path)
+        self.contents[dir_name] = DataDirectory(dir_path)
+
     @staticmethod
     def _characterize_dir(path) -> Dict[str, 'DataDirectory']:
         """
